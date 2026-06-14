@@ -4,3 +4,6 @@ storage/
 tmp/
 bin/
 *.log
+/api
+/worker
+/admin
