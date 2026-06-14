@@ -47,12 +47,17 @@ func New(deps Dependencies) *gin.Engine {
 	r.Use(
 		middleware.RequestID(),
 		middleware.Recovery(),
-		middleware.Logger(),
+		middleware.Logger(deps.Config.App.Env),
 		middleware.CORS(deps.Config.CORS.AllowedOrigins),
 	)
 
 	v1 := r.Group("/api/v1")
 	v1.GET("/health", deps.HealthHandler.Handle)
+
+	r.StaticFile("/swagger.html", "docs/swagger.html")
+	r.StaticFile("/swagger", "docs/swagger.html")
+	r.StaticFile("/openapi.yaml", "docs/openapi.yaml")
+	r.StaticFile("/docs/API_MOBILE.md", "docs/API_MOBILE.md")
 
 	authRoutes := v1.Group("/auth")
 	authRoutes.POST("/request-otp", deps.AuthHandler.RequestOTP)

@@ -64,7 +64,13 @@ docs/openapi.yaml
 
 Open the YAML in Swagger UI, Redoc, Postman, or any OpenAPI-compatible tool.
 
-Local Swagger UI:
+Swagger through the API server:
+
+```text
+http://localhost:8080/swagger.html
+```
+
+Alternative static docs server:
 
 ```bash
 python3 -m http.server 9000 --directory docs
