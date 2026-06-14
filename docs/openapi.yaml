@@ -1,0 +1,1337 @@
+openapi: 3.0.3
+info:
+  title: Aura Mobile API
+  version: 1.0.0
+  description: Mobile-facing API contract for the Aura backend.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: Health
+  - name: Auth
+  - name: Profile
+  - name: Media
+  - name: Location
+  - name: Discovery
+  - name: Matches
+  - name: Chat
+  - name: Notifications
+  - name: Safety
+  - name: Subscriptions
+security:
+  - bearerAuth: []
+paths:
+  /api/v1/health:
+    get:
+      tags: [Health]
+      summary: Health check
+      security: []
+      responses:
+        "200":
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
+  /api/v1/auth/request-otp:
+    post:
+      tags: [Auth]
+      summary: Request OTP
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RequestOtpRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/auth/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify OTP and login/register
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/VerifyOtpRequest"
+      responses:
+        "200":
+          description: Auth token pair
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AuthResponse"
+
+  /api/v1/auth/refresh-token:
+    post:
+      tags: [Auth]
+      summary: Refresh token pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RefreshTokenRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current device/session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LogoutRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Logout all user sessions
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Current authenticated user
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/auth/account:
+    delete:
+      tags: [Auth]
+      summary: Soft-delete current account
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/catalog/interests:
+    get:
+      tags: [Profile]
+      summary: Interest catalog
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/catalog/prompts:
+    get:
+      tags: [Profile]
+      summary: Prompt catalog
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/catalog/lifestyle-questions:
+    get:
+      tags: [Profile]
+      summary: Lifestyle question catalog
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/me:
+    get:
+      tags: [Profile]
+      summary: Current user profile
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+    patch:
+      tags: [Profile]
+      summary: Partially update profile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProfileRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/interests:
+    put:
+      tags: [Profile]
+      summary: Replace selected interests
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateInterestsRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/prompts:
+    put:
+      tags: [Profile]
+      summary: Replace profile prompts
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePromptsRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/lifestyle:
+    put:
+      tags: [Profile]
+      summary: Replace lifestyle answers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLifestyleRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/complete:
+    post:
+      tags: [Profile]
+      summary: Complete profile onboarding
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/profile/media/me:
+    get:
+      tags: [Media]
+      summary: Current user's profile media
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/media/photos:
+    post:
+      tags: [Media]
+      summary: Upload profile photo
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                isPrimary:
+                  type: boolean
+      responses:
+        "201":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/media/intro-video:
+    post:
+      tags: [Media]
+      summary: Upload intro video
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/media/{mediaUuid}/primary:
+    patch:
+      tags: [Media]
+      summary: Set primary profile photo
+      parameters:
+        - $ref: "#/components/parameters/MediaUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/media/reorder:
+    patch:
+      tags: [Media]
+      summary: Reorder profile media
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReorderMediaRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/profile/media/{mediaUuid}:
+    delete:
+      tags: [Media]
+      summary: Soft-delete profile media
+      parameters:
+        - $ref: "#/components/parameters/MediaUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/media/{mediaUuid}/{variant}:
+    get:
+      tags: [Media]
+      summary: Serve authorized media variant
+      parameters:
+        - $ref: "#/components/parameters/MediaUuid"
+        - name: variant
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [original, display, thumbnail, transcoded]
+      responses:
+        "200":
+          description: Binary media response
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/location/me:
+    get:
+      tags: [Location]
+      summary: Current user's exact location
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/location:
+    put:
+      tags: [Location]
+      summary: Update current user's location
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateLocationRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/discovery/preferences:
+    get:
+      tags: [Discovery]
+      summary: Discovery preferences
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+    put:
+      tags: [Discovery]
+      summary: Replace discovery preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DiscoveryPreferencesRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/discovery/readiness:
+    get:
+      tags: [Discovery]
+      summary: Discovery readiness
+      responses:
+        "200":
+          description: Live discovery readiness
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/DiscoveryReadiness"
+
+  /api/v1/discovery/feed:
+    get:
+      tags: [Discovery]
+      summary: Discovery feed
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/PaginatedSuccess"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/discovery/profiles/{userUuid}:
+    get:
+      tags: [Discovery]
+      summary: Discovery profile detail
+      parameters:
+        - $ref: "#/components/parameters/UserUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/discovery/impressions:
+    post:
+      tags: [Discovery]
+      summary: Record discovery impressions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateImpressionsRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/discovery/actions:
+    post:
+      tags: [Discovery]
+      summary: Like, pass, or Super Like a discoverable user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateActionRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "201":
+          $ref: "#/components/responses/Success"
+        "429":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/matches:
+    get:
+      tags: [Matches]
+      summary: Active match list
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/PaginatedSuccess"
+
+  /api/v1/matches/{matchUuid}:
+    get:
+      tags: [Matches]
+      summary: Match detail
+      parameters:
+        - $ref: "#/components/parameters/MatchUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/matches/{matchUuid}/seen:
+    post:
+      tags: [Matches]
+      summary: Mark match seen/opened
+      parameters:
+        - $ref: "#/components/parameters/MatchUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/matches/{matchUuid}/unmatch:
+    post:
+      tags: [Matches]
+      summary: Unmatch
+      parameters:
+        - $ref: "#/components/parameters/MatchUuid"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UnmatchRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/chats:
+    get:
+      tags: [Chat]
+      summary: Chat list
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/PaginatedSuccess"
+
+  /api/v1/chats/{conversationUuid}/messages:
+    get:
+      tags: [Chat]
+      summary: Message history
+      parameters:
+        - $ref: "#/components/parameters/ConversationUuid"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/PaginatedSuccess"
+    post:
+      tags: [Chat]
+      summary: Send text message
+      parameters:
+        - $ref: "#/components/parameters/ConversationUuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendMessageRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/chats/{conversationUuid}/read:
+    post:
+      tags: [Chat]
+      summary: Mark conversation read
+      parameters:
+        - $ref: "#/components/parameters/ConversationUuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MarkReadRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/messages/{messageUuid}:
+    delete:
+      tags: [Chat]
+      summary: Soft-delete own message
+      parameters:
+        - $ref: "#/components/parameters/MessageUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /ws:
+    get:
+      tags: [Chat]
+      summary: WebSocket realtime connection
+      description: Prefer Authorization header. Mobile clients may pass access token as query parameter.
+      parameters:
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "101":
+          description: WebSocket upgrade
+
+  /api/v1/devices/fcm-token:
+    post:
+      tags: [Notifications]
+      summary: Register/update device FCM token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpsertFcmTokenRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+    delete:
+      tags: [Notifications]
+      summary: Remove device FCM token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeleteFcmTokenRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: Notification list
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/PaginatedSuccess"
+
+  /api/v1/notifications/{notificationUuid}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification read
+      parameters:
+        - $ref: "#/components/parameters/NotificationUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Mark all notifications read
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/notification-settings:
+    get:
+      tags: [Notifications]
+      summary: Notification settings
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+    put:
+      tags: [Notifications]
+      summary: Replace notification settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotificationSettingsRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/reports/reasons:
+    get:
+      tags: [Safety]
+      summary: Report reason catalog
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/reports:
+    post:
+      tags: [Safety]
+      summary: Create report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/reports/me:
+    get:
+      tags: [Safety]
+      summary: Current user's submitted reports
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/safety/block-and-report:
+    post:
+      tags: [Safety]
+      summary: Create report and block target user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReportRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/safety/settings:
+    get:
+      tags: [Safety]
+      summary: Safety settings
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+    put:
+      tags: [Safety]
+      summary: Replace safety settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SafetySettingsRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/blocks:
+    get:
+      tags: [Safety]
+      summary: Blocked user list
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/blocks/{userUuid}:
+    post:
+      tags: [Safety]
+      summary: Block user
+      parameters:
+        - $ref: "#/components/parameters/UserUuid"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reasonCode:
+                  type: string
+                note:
+                  type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+    delete:
+      tags: [Safety]
+      summary: Unblock user
+      parameters:
+        - $ref: "#/components/parameters/UserUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/subscriptions/plans:
+    get:
+      tags: [Subscriptions]
+      summary: Active subscription plans
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/subscriptions/me:
+    get:
+      tags: [Subscriptions]
+      summary: Current active subscription
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/subscriptions/entitlements:
+    get:
+      tags: [Subscriptions]
+      summary: Current entitlements
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/subscriptions/usage:
+    get:
+      tags: [Subscriptions]
+      summary: Current UTC-day premium usage
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/subscriptions/premium-status:
+    get:
+      tags: [Subscriptions]
+      summary: Current premium status
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/subscriptions/manual-payment-requests:
+    get:
+      tags: [Subscriptions]
+      summary: Current user's manual payment requests
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+    post:
+      tags: [Subscriptions]
+      summary: Submit manual payment request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateManualPaymentRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Success"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      schema:
+        type: string
+    UserUuid:
+      name: userUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MediaUuid:
+      name: mediaUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MatchUuid:
+      name: matchUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ConversationUuid:
+      name: conversationUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    MessageUuid:
+      name: messageUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    NotificationUuid:
+      name: notificationUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    Success:
+      description: Successful API response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiResponse"
+    PaginatedSuccess:
+      description: Successful paginated response
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/ApiResponse"
+              - type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      items:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: true
+                      nextCursor:
+                        type: string
+                        nullable: true
+    Error:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiErrorResponse"
+
+  schemas:
+    ApiResponse:
+      type: object
+      required: [success, statusCode, message]
+      properties:
+        success:
+          type: boolean
+          example: true
+        statusCode:
+          type: integer
+          example: 200
+        message:
+          type: string
+          example: OK
+        data:
+          nullable: true
+          additionalProperties: true
+
+    ApiErrorResponse:
+      type: object
+      required: [success, statusCode, message, error]
+      properties:
+        success:
+          type: boolean
+          example: false
+        statusCode:
+          type: integer
+          example: 400
+        message:
+          type: string
+          example: Validation failed
+        error:
+          type: object
+          required: [code]
+          properties:
+            code:
+              type: string
+              example: VALIDATION_ERROR
+            details:
+              nullable: true
+              additionalProperties: true
+
+    RequestOtpRequest:
+      type: object
+      required: [channel, purpose]
+      properties:
+        channel:
+          type: string
+          enum: [WHATSAPP, EMAIL]
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        purpose:
+          type: string
+          example: LOGIN
+        deviceId:
+          type: string
+
+    VerifyOtpRequest:
+      type: object
+      required: [channel, purpose, code]
+      properties:
+        channel:
+          type: string
+          enum: [WHATSAPP, EMAIL]
+        phone:
+          type: string
+        email:
+          type: string
+          format: email
+        purpose:
+          type: string
+          example: LOGIN
+        code:
+          type: string
+        deviceId:
+          type: string
+        deviceName:
+          type: string
+        platform:
+          type: string
+        fcmToken:
+          type: string
+        appVersion:
+          type: string
+        osVersion:
+          type: string
+
+    RefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+        deviceId:
+          type: string
+
+    LogoutRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+        deviceId:
+          type: string
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        refreshExpiresIn:
+          type: integer
+        user:
+          type: object
+          additionalProperties: true
+
+    UpdateProfileRequest:
+      type: object
+      properties:
+        displayName:
+          type: string
+        dateOfBirth:
+          type: string
+          format: date
+        gender:
+          type: string
+          enum: [MALE, FEMALE, NON_BINARY, OTHER]
+        lookingForGender:
+          type: string
+          enum: [MALE, FEMALE, EVERYONE]
+        bio:
+          type: string
+        heightCm:
+          type: integer
+        education:
+          type: string
+        jobTitle:
+          type: string
+        company:
+          type: string
+        city:
+          type: string
+        country:
+          type: string
+        relationshipGoal:
+          type: string
+          enum: [SERIOUS_RELATIONSHIP, LONG_TERM, FRIENDSHIP, CASUAL, NOT_SURE]
+        showAge:
+          type: boolean
+        showDistance:
+          type: boolean
+
+    UpdateInterestsRequest:
+      type: object
+      required: [interestIds]
+      properties:
+        interestIds:
+          type: array
+          minItems: 3
+          maxItems: 15
+          items:
+            type: integer
+
+    UpdatePromptsRequest:
+      type: object
+      required: [prompts]
+      properties:
+        prompts:
+          type: array
+          minItems: 2
+          maxItems: 3
+          items:
+            type: object
+            required: [promptQuestionId, answer]
+            properties:
+              promptQuestionId:
+                type: integer
+              answer:
+                type: string
+                maxLength: 300
+
+    UpdateLifestyleRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          items:
+            type: object
+            required: [lifestyleQuestionId, answer]
+            properties:
+              lifestyleQuestionId:
+                type: integer
+              answer:
+                nullable: true
+
+    ReorderMediaRequest:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            type: object
+            required: [mediaUuid, sortOrder]
+            properties:
+              mediaUuid:
+                type: string
+                format: uuid
+              sortOrder:
+                type: integer
+
+    UpdateLocationRequest:
+      type: object
+      required: [latitude, longitude, source]
+      properties:
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        accuracyMeters:
+          type: number
+          format: double
+        city:
+          type: string
+        country:
+          type: string
+        source:
+          type: string
+          enum: [GPS, MANUAL, IP]
+
+    DiscoveryPreferencesRequest:
+      type: object
+      required: [minAge, maxAge, preferredGenders, maxDistanceKm, verifiedOnly, showMeInDiscovery, hideDistance]
+      properties:
+        minAge:
+          type: integer
+          minimum: 18
+        maxAge:
+          type: integer
+          maximum: 80
+        preferredGenders:
+          type: array
+          items:
+            type: string
+            enum: [MALE, FEMALE, NON_BINARY, OTHER, EVERYONE]
+        maxDistanceKm:
+          type: integer
+          minimum: 1
+          maximum: 200
+        verifiedOnly:
+          type: boolean
+        showMeInDiscovery:
+          type: boolean
+        hideDistance:
+          type: boolean
+
+    DiscoveryReadiness:
+      type: object
+      properties:
+        discoveryEligible:
+          type: boolean
+        missing:
+          type: array
+          items:
+            type: string
+        blocked:
+          type: array
+          items:
+            type: string
+
+    CreateImpressionsRequest:
+      type: object
+      required: [items]
+      properties:
+        source:
+          type: string
+          example: DISCOVERY_FEED
+        items:
+          type: array
+          items:
+            type: object
+            required: [candidateUserUuid, rankPosition]
+            properties:
+              candidateUserUuid:
+                type: string
+                format: uuid
+              rankPosition:
+                type: integer
+
+    CreateActionRequest:
+      type: object
+      required: [targetUserUuid, actionType, clientActionId]
+      properties:
+        targetUserUuid:
+          type: string
+          format: uuid
+        actionType:
+          type: string
+          enum: [LIKE, PASS, SUPER_LIKE]
+        clientActionId:
+          type: string
+          format: uuid
+
+    UnmatchRequest:
+      type: object
+      properties:
+        reasonCode:
+          type: string
+          maxLength: 50
+        reasonNote:
+          type: string
+          maxLength: 300
+
+    SendMessageRequest:
+      type: object
+      required: [clientMessageId, messageType, body]
+      properties:
+        clientMessageId:
+          type: string
+          format: uuid
+        messageType:
+          type: string
+          enum: [TEXT]
+        body:
+          type: string
+          maxLength: 2000
+
+    MarkReadRequest:
+      type: object
+      required: [lastReadMessageUuid]
+      properties:
+        lastReadMessageUuid:
+          type: string
+          format: uuid
+
+    UpsertFcmTokenRequest:
+      type: object
+      required: [deviceId, fcmToken]
+      properties:
+        deviceId:
+          type: string
+        fcmToken:
+          type: string
+        deviceName:
+          type: string
+        platform:
+          type: string
+        appVersion:
+          type: string
+        osVersion:
+          type: string
+
+    DeleteFcmTokenRequest:
+      type: object
+      required: [deviceId]
+      properties:
+        deviceId:
+          type: string
+
+    NotificationSettingsRequest:
+      type: object
+      required: [pushEnabled, newMatchEnabled, chatMessageEnabled, superLikeEnabled, quietHoursEnabled, timezone]
+      properties:
+        pushEnabled:
+          type: boolean
+        newMatchEnabled:
+          type: boolean
+        chatMessageEnabled:
+          type: boolean
+        superLikeEnabled:
+          type: boolean
+        quietHoursEnabled:
+          type: boolean
+        quietHoursStart:
+          type: string
+          nullable: true
+          example: "23:00"
+        quietHoursEnd:
+          type: string
+          nullable: true
+          example: "07:00"
+        timezone:
+          type: string
+          example: Asia/Dhaka
+
+    CreateReportRequest:
+      type: object
+      required: [targetType, targetUuid, reasonCode]
+      properties:
+        targetType:
+          type: string
+          enum: [USER, PROFILE, MESSAGE, MEDIA, MATCH]
+        targetUuid:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+          enum: [FAKE_PROFILE, HARASSMENT, HATE_SPEECH, NUDITY_OR_SEXUAL_CONTENT, SCAM_OR_SPAM, UNDERAGE, VIOLENCE_OR_THREAT, IMPERSONATION, OTHER]
+        note:
+          type: string
+          maxLength: 1000
+        blockUser:
+          type: boolean
+
+    SafetySettingsRequest:
+      type: object
+      required: [allowMessageRequests, autoHideBlockedUsers]
+      properties:
+        allowMessageRequests:
+          type: boolean
+        autoHideBlockedUsers:
+          type: boolean
+
+    CreateManualPaymentRequest:
+      type: object
+      required: [planCode, paymentProvider, paymentReference]
+      properties:
+        planCode:
+          type: string
+          example: AURA_PREMIUM_30
+        paymentProvider:
+          type: string
+          example: BKASH
+        paymentReference:
+          type: string
+          example: TRX123456
+        payerPhone:
+          type: string
+        note:
+          type: string
+
