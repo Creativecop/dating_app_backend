@@ -47,6 +47,7 @@ func main() {
 
 	server := queue.NewServer(cfg.Redis)
 	mux := asynq.NewServeMux()
+	log.Printf("[OTP] worker_config otp_provider=%s whatsapp_enabled=%t whatsapp_template=%s", cfg.OTP.Provider, cfg.WhatsApp.Enabled, cfg.WhatsApp.TemplateName)
 	otpProcessor := otp.NewProcessor(db, provider.NewRegistry(cfg))
 	otpProcessor.Register(mux)
 	profileService := profile.NewService(db, cfg.Discovery)

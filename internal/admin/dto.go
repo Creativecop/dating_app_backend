@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -32,6 +33,11 @@ type RefreshTokenRequest struct {
 
 type LogoutRequest struct {
 	RefreshToken string `json:"refreshToken"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"currentPassword" binding:"required"`
+	NewPassword     string `json:"newPassword" binding:"required"`
 }
 
 type AuthResponse struct {
@@ -67,4 +73,34 @@ func toAdminUserResponse(user AdminUser, permissions []string) AdminUserResponse
 		LastLoginAt: user.LastLoginAt,
 		Permissions: permissions,
 	}
+}
+
+type AuditLogListQuery struct {
+	AdminUserUUID string
+	Action        string
+	ResourceType  string
+	ResourceUUID  string
+	CreatedFrom   string
+	CreatedTo     string
+	Limit         string
+	Cursor        string
+}
+
+type AuditLogListResponse struct {
+	Items      []AuditLogResponse `json:"items"`
+	NextCursor *string            `json:"nextCursor"`
+}
+
+type AuditLogResponse struct {
+	AuditLogUUID   string          `json:"auditLogUuid"`
+	AdminUserUUID  *string         `json:"adminUserUuid"`
+	AdminEmail     *string         `json:"adminEmail"`
+	Action         string          `json:"action"`
+	ResourceType   string          `json:"resourceType"`
+	ResourceUUID   *string         `json:"resourceUuid"`
+	BeforeSnapshot json.RawMessage `json:"beforeSnapshot"`
+	AfterSnapshot  json.RawMessage `json:"afterSnapshot"`
+	IPAddress      *string         `json:"ipAddress"`
+	UserAgent      *string         `json:"userAgent"`
+	CreatedAt      time.Time       `json:"createdAt"`
 }

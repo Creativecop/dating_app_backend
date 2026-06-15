@@ -65,15 +65,19 @@ type OTPConfig struct {
 	MaxPerIdentifierHour  int
 	MaxPerIPHour          int
 	Provider              string
+	DevBypassEnabled      bool
+	DevBypassCode         string
 }
 
 type WhatsAppConfig struct {
-	Enabled       bool
-	Provider      string
-	PhoneNumberID string
-	AccessToken   string
-	TemplateName  string
-	LanguageCode  string
+	Enabled           bool
+	Provider          string
+	BusinessAccountID string
+	PhoneNumberID     string
+	AccessToken       string
+	TemplateName      string
+	LanguageCode      string
+	GraphAPIVersion   string
 }
 
 type EmailConfig struct {
@@ -170,14 +174,18 @@ func Load() (*Config, error) {
 			MaxPerIdentifierHour:  envInt("OTP_MAX_PER_IDENTIFIER_HOUR", 5),
 			MaxPerIPHour:          envInt("OTP_MAX_PER_IP_HOUR", 20),
 			Provider:              strings.ToLower(env("OTP_PROVIDER", "noop")),
+			DevBypassEnabled:      envBool("OTP_DEV_BYPASS_ENABLED", false),
+			DevBypassCode:         env("OTP_DEV_BYPASS_CODE", "123456"),
 		},
 		WhatsApp: WhatsAppConfig{
-			Enabled:       envBool("WHATSAPP_ENABLED", false),
-			Provider:      env("WHATSAPP_PROVIDER", "meta"),
-			PhoneNumberID: env("WHATSAPP_PHONE_NUMBER_ID", ""),
-			AccessToken:   env("WHATSAPP_ACCESS_TOKEN", ""),
-			TemplateName:  env("WHATSAPP_TEMPLATE_NAME", "auth_code"),
-			LanguageCode:  env("WHATSAPP_LANGUAGE_CODE", "en_US"),
+			Enabled:           envBool("WHATSAPP_ENABLED", false),
+			Provider:          env("WHATSAPP_PROVIDER", "meta"),
+			BusinessAccountID: env("WHATSAPP_BUSINESS_ACCOUNT_ID", ""),
+			PhoneNumberID:     env("WHATSAPP_PHONE_NUMBER_ID", ""),
+			AccessToken:       env("WHATSAPP_ACCESS_TOKEN", ""),
+			TemplateName:      env("WHATSAPP_TEMPLATE_NAME", "auth_code"),
+			LanguageCode:      env("WHATSAPP_LANGUAGE_CODE", "en_US"),
+			GraphAPIVersion:   env("WHATSAPP_GRAPH_API_VERSION", "v25.0"),
 		},
 		Email: EmailConfig{
 			Enabled:      envBool("EMAIL_ENABLED", false),
@@ -225,6 +233,9 @@ func Load() (*Config, error) {
 
 	if cfg.OTP.Length < 4 || cfg.OTP.Length > 10 {
 		return nil, fmt.Errorf("OTP_LENGTH must be between 4 and 10")
+	}
+	if cfg.App.Env == "production" && cfg.OTP.DevBypassEnabled {
+		return nil, fmt.Errorf("OTP_DEV_BYPASS_ENABLED cannot be true in production")
 	}
 	if cfg.Discovery.LocationMaxAgeDays < 1 {
 		return nil, fmt.Errorf("DISCOVERY_LOCATION_MAX_AGE_DAYS must be at least 1")

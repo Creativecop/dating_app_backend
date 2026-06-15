@@ -59,6 +59,24 @@ func (h *Handler) Logout(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Admin logged out successfully", nil)
 }
 
+func (h *Handler) ChangePassword(c *gin.Context) {
+	adminUser, ok := CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", CodeUnauthorized, nil)
+		return
+	}
+	var req ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Validation(c, err.Error())
+		return
+	}
+	if err := h.service.ChangePassword(c.Request.Context(), adminUser.AdminUserID, req, requestMeta(c)); err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Password changed successfully. Please log in again.", nil)
+}
+
 func (h *Handler) Me(c *gin.Context) {
 	adminUser, ok := CurrentAdmin(c)
 	if !ok {
@@ -71,6 +89,33 @@ func (h *Handler) Me(c *gin.Context) {
 		return
 	}
 	response.Success(c, http.StatusOK, "Admin fetched successfully", result)
+}
+
+func (h *Handler) ListAuditLogs(c *gin.Context) {
+	result, err := h.service.ListAuditLogs(c.Request.Context(), AuditLogListQuery{
+		AdminUserUUID: c.Query("adminUserUuid"),
+		Action:        c.Query("action"),
+		ResourceType:  c.Query("resourceType"),
+		ResourceUUID:  c.Query("resourceUuid"),
+		CreatedFrom:   c.Query("createdFrom"),
+		CreatedTo:     c.Query("createdTo"),
+		Limit:         c.Query("limit"),
+		Cursor:        c.Query("cursor"),
+	})
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Audit logs fetched successfully", result)
+}
+
+func (h *Handler) AuditLogDetail(c *gin.Context) {
+	result, err := h.service.AuditLogDetail(c.Request.Context(), c.Param("auditLogUuid"))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Audit log fetched successfully", result)
 }
 
 func (h *Handler) writeError(c *gin.Context, err error) {

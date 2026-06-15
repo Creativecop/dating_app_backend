@@ -18,6 +18,7 @@ tags:
   - name: Notifications
   - name: Safety
   - name: Subscriptions
+  - name: Admin
 security:
   - bearerAuth: []
 paths:
@@ -172,6 +173,12 @@ paths:
           $ref: "#/components/responses/Success"
 
   /api/v1/profile/interests:
+    get:
+      tags: [Profile]
+      summary: Interest catalog
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
     put:
       tags: [Profile]
       summary: Replace selected interests
@@ -186,6 +193,12 @@ paths:
           $ref: "#/components/responses/Success"
 
   /api/v1/profile/prompts:
+    get:
+      tags: [Profile]
+      summary: Prompt catalog
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
     put:
       tags: [Profile]
       summary: Replace profile prompts
@@ -200,6 +213,12 @@ paths:
           $ref: "#/components/responses/Success"
 
   /api/v1/profile/lifestyle:
+    get:
+      tags: [Profile]
+      summary: Lifestyle question catalog
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
     put:
       tags: [Profile]
       summary: Replace lifestyle answers
@@ -249,7 +268,7 @@ paths:
                 isPrimary:
                   type: boolean
       responses:
-        "201":
+        "202":
           $ref: "#/components/responses/Success"
 
   /api/v1/profile/media/intro-video:
@@ -268,7 +287,7 @@ paths:
                   type: string
                   format: binary
       responses:
-        "201":
+        "202":
           $ref: "#/components/responses/Success"
 
   /api/v1/profile/media/{mediaUuid}/primary:
@@ -309,6 +328,10 @@ paths:
     get:
       tags: [Media]
       summary: Serve authorized media variant
+      description: >-
+        Requires `Authorization: Bearer <accessToken>`. Uploads are accepted
+        before async processing completes, so display and thumbnail variants may
+        return 404 until they are generated.
       parameters:
         - $ref: "#/components/parameters/MediaUuid"
         - name: variant
@@ -320,7 +343,11 @@ paths:
       responses:
         "200":
           description: Binary media response
+        "401":
+          $ref: "#/components/responses/Error"
         "403":
+          $ref: "#/components/responses/Error"
+        "404":
           $ref: "#/components/responses/Error"
 
   /api/v1/location/me:
@@ -796,6 +823,195 @@ paths:
         "201":
           $ref: "#/components/responses/Success"
 
+  /api/v1/admin/auth/login:
+    post:
+      tags: [Admin]
+      summary: Admin login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLoginRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/auth/refresh-token:
+    post:
+      tags: [Admin]
+      summary: Refresh admin token pair
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRefreshTokenRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/auth/logout:
+    post:
+      tags: [Admin]
+      summary: Revoke admin session
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminLogoutRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/admin/auth/me:
+    get:
+      tags: [Admin]
+      summary: Current admin user
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /api/v1/admin/auth/change-password:
+    post:
+      tags: [Admin]
+      summary: Change admin password and revoke all admin sessions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminChangePasswordRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "401":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/subscriptions/payment-requests:
+    get:
+      tags: [Admin]
+      summary: Admin payment request list
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, UNDER_REVIEW, APPROVED, REJECTED, CANCELED]
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/subscriptions/payment-requests/{paymentRequestUuid}:
+    get:
+      tags: [Admin]
+      summary: Admin payment request detail
+      parameters:
+        - $ref: "#/components/parameters/PaymentRequestUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/subscriptions/payment-requests/{paymentRequestUuid}/approve:
+    post:
+      tags: [Admin]
+      summary: Approve manual payment request
+      parameters:
+        - $ref: "#/components/parameters/PaymentRequestUuid"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminReviewPaymentRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/subscriptions/payment-requests/{paymentRequestUuid}/reject:
+    post:
+      tags: [Admin]
+      summary: Reject manual payment request
+      parameters:
+        - $ref: "#/components/parameters/PaymentRequestUuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminRejectPaymentRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: Admin audit log list
+      parameters:
+        - name: adminUserUuid
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+        - name: resourceUuid
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: createdFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: createdTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/audit-logs/{auditLogUuid}:
+    get:
+      tags: [Admin]
+      summary: Admin audit log detail
+      parameters:
+        - $ref: "#/components/parameters/AuditLogUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "404":
+          $ref: "#/components/responses/Error"
+
 components:
   securitySchemes:
     bearerAuth:
@@ -855,6 +1071,20 @@ components:
         format: uuid
     NotificationUuid:
       name: notificationUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    PaymentRequestUuid:
+      name: paymentRequestUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AuditLogUuid:
+      name: auditLogUuid
       in: path
       required: true
       schema:
@@ -1016,6 +1246,130 @@ components:
         user:
           type: object
           additionalProperties: true
+
+    AdminLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+
+    AdminRefreshTokenRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    AdminLogoutRequest:
+      type: object
+      properties:
+        refreshToken:
+          type: string
+
+    AdminChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+        newPassword:
+          type: string
+          minLength: 12
+
+    AdminAuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+        refreshExpiresIn:
+          type: integer
+        admin:
+          $ref: "#/components/schemas/AdminUser"
+
+    AdminUser:
+      type: object
+      properties:
+        uuid:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [ACTIVE, SUSPENDED]
+        lastLoginAt:
+          type: string
+          format: date-time
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+
+    AdminReviewPaymentRequest:
+      type: object
+      properties:
+        note:
+          type: string
+          maxLength: 500
+
+    AdminRejectPaymentRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+
+    AdminAuditLog:
+      type: object
+      properties:
+        auditLogUuid:
+          type: string
+          format: uuid
+        adminUserUuid:
+          type: string
+          format: uuid
+          nullable: true
+        adminEmail:
+          type: string
+          format: email
+          nullable: true
+        action:
+          type: string
+        resourceType:
+          type: string
+        resourceUuid:
+          type: string
+          format: uuid
+          nullable: true
+        beforeSnapshot:
+          type: object
+          additionalProperties: true
+        afterSnapshot:
+          type: object
+          additionalProperties: true
+        ipAddress:
+          type: string
+          nullable: true
+        userAgent:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
 
     UpdateProfileRequest:
       type: object
@@ -1334,4 +1688,3 @@ components:
           type: string
         note:
           type: string
-

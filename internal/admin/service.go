@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
@@ -94,6 +95,9 @@ func (s *Service) RefreshToken(ctx context.Context, req RefreshTokenRequest, met
 		if session.RevokedAt != nil || session.ExpiresAt.Before(now) || session.AdminUser.Status != StatusActive {
 			return ErrInvalidRefresh
 		}
+		if !adminRefreshSessionStateValid(session.AdminUser, session.CreatedAt) {
+			return ErrInvalidRefresh
+		}
 		nextRefresh, err := generateRefreshToken()
 		if err != nil {
 			return err
@@ -143,6 +147,66 @@ func (s *Service) Logout(ctx context.Context, adminID uint64, req LogoutRequest)
 	return query.Updates(map[string]any{"revoked_at": now, "updated_at": now}).Error
 }
 
+func (s *Service) ChangePassword(ctx context.Context, adminID uint64, req ChangePasswordRequest, meta RequestMeta) error {
+	currentPassword := strings.TrimSpace(req.CurrentPassword)
+	newPassword := strings.TrimSpace(req.NewPassword)
+	if currentPassword == "" || newPassword == "" {
+		return validationError("Current password and new password are required", nil)
+	}
+	if len(newPassword) < 12 {
+		return validationError("newPassword must be at least 12 characters", map[string]any{"field": "newPassword"})
+	}
+	if currentPassword == newPassword {
+		return validationError("newPassword must be different from currentPassword", map[string]any{"field": "newPassword"})
+	}
+
+	now := time.Now().UTC()
+	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var user AdminUser
+		if err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", adminID).
+			First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return notFoundError("Admin user not found")
+			}
+			return err
+		}
+		if user.Status != StatusActive {
+			return ErrInactiveAdmin
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
+			return unauthorizedError()
+		}
+		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(newPassword)); err == nil {
+			return validationError("newPassword must be different from currentPassword", map[string]any{"field": "newPassword"})
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		if err := tx.WithContext(ctx).Model(&AdminUser{}).Where("id = ?", adminID).Updates(map[string]any{
+			"password_hash":       string(hash),
+			"password_changed_at": now,
+			"token_version":       gorm.Expr("token_version + 1"),
+			"updated_at":          now,
+		}).Error; err != nil {
+			return err
+		}
+		if err := tx.WithContext(ctx).Model(&AdminSession{}).
+			Where("admin_user_id = ? AND revoked_at IS NULL", adminID).
+			Updates(map[string]any{
+				"revoked_at":     now,
+				"revoked_reason": RevokedReasonPasswordChanged,
+				"updated_at":     now,
+			}).Error; err != nil {
+			return err
+		}
+		return insertAdminAuditLogTx(ctx, tx, adminID, "ADMIN_PASSWORD_CHANGED", "ADMIN_USER", &user.UUID, map[string]any{}, map[string]any{
+			"sessionsRevoked": true,
+		}, meta)
+	})
+}
+
 func (s *Service) Me(ctx context.Context, adminID uint64) (*AdminUserResponse, error) {
 	var user AdminUser
 	if err := s.db.WithContext(ctx).Where("id = ?", adminID).First(&user).Error; err != nil {
@@ -173,14 +237,16 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 		return nil, ErrUnauthorized
 	}
 	var row struct {
-		AdminUserID      uint64
-		AdminUserUUID    uuid.UUID
-		AdminSessionID   uint64
-		AdminSessionUUID uuid.UUID
-		Email            string
-		Status           string
-		ExpiresAt        time.Time
-		RevokedAt        *time.Time
+		AdminUserID       uint64
+		AdminUserUUID     uuid.UUID
+		AdminSessionID    uint64
+		AdminSessionUUID  uuid.UUID
+		Email             string
+		Status            string
+		TokenVersion      int
+		PasswordChangedAt *time.Time
+		ExpiresAt         time.Time
+		RevokedAt         *time.Time
 	}
 	err = s.db.WithContext(ctx).Raw(`
 		SELECT
@@ -190,6 +256,8 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 		  s.uuid AS admin_session_uuid,
 		  au.email,
 		  au.status,
+		  au.token_version,
+		  au.password_changed_at,
 		  s.expires_at,
 		  s.revoked_at
 		FROM admin_sessions s
@@ -201,6 +269,12 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 		return nil, ErrUnauthorized
 	}
 	if row.AdminUserID == 0 || row.Status != StatusActive || row.RevokedAt != nil || row.ExpiresAt.Before(time.Now().UTC()) {
+		return nil, ErrUnauthorized
+	}
+	if claims.TokenVersion != row.TokenVersion {
+		return nil, ErrUnauthorized
+	}
+	if !adminTokenStateValid(AdminUser{TokenVersion: row.TokenVersion, PasswordChangedAt: row.PasswordChangedAt}, claims.IssuedAt) {
 		return nil, ErrUnauthorized
 	}
 	return &AuthenticatedAdmin{
@@ -253,6 +327,7 @@ func (s *Service) CreateSuperAdmin(ctx context.Context, email string, password s
 		PermissionPaymentRequestsRead,
 		PermissionPaymentRequestsApprove,
 		PermissionPaymentRequestsReject,
+		PermissionAuditRead,
 	}
 	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		user := AdminUser{
@@ -260,6 +335,7 @@ func (s *Service) CreateSuperAdmin(ctx context.Context, email string, password s
 			Email:        email,
 			PasswordHash: string(hash),
 			Status:       StatusActive,
+			TokenVersion: 1,
 			CreatedAt:    now,
 			UpdatedAt:    now,
 		}
@@ -268,6 +344,7 @@ func (s *Service) CreateSuperAdmin(ctx context.Context, email string, password s
 			DoUpdates: clause.Assignments(map[string]any{
 				"password_hash": string(hash),
 				"status":        StatusActive,
+				"token_version": gorm.Expr("GREATEST(admin_users.token_version, 1)"),
 				"updated_at":    now,
 			}),
 		}).Create(&user).Error; err != nil {
@@ -315,4 +392,27 @@ func (s *Service) createSession(ctx context.Context, adminID uint64, meta Reques
 
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
+}
+
+func adminTokenStateValid(user AdminUser, issuedAt *jwt.NumericDate) bool {
+	if user.TokenVersion < 1 {
+		return false
+	}
+	if user.PasswordChangedAt == nil {
+		return true
+	}
+	if issuedAt == nil {
+		return false
+	}
+	return !issuedAt.Time.Before(*user.PasswordChangedAt)
+}
+
+func adminRefreshSessionStateValid(user AdminUser, sessionCreatedAt time.Time) bool {
+	if user.TokenVersion < 1 {
+		return false
+	}
+	if user.PasswordChangedAt == nil {
+		return true
+	}
+	return !sessionCreatedAt.Before(*user.PasswordChangedAt)
 }

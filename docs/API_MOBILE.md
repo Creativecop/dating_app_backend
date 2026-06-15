@@ -104,8 +104,11 @@ Catalog endpoints:
 
 ```text
 GET /api/v1/profile/catalog/interests
+GET /api/v1/profile/interests
 GET /api/v1/profile/catalog/prompts
+GET /api/v1/profile/prompts
 GET /api/v1/profile/catalog/lifestyle-questions
+GET /api/v1/profile/lifestyle
 ```
 
 Profile endpoints:
@@ -192,6 +195,14 @@ transcoded
 ```
 
 Mobile clients should use `display` for profile detail and `thumbnail` for lists. Non-owners cannot access `original`.
+
+Media URLs are authenticated. Image requests to `/api/v1/media/{mediaUuid}/{variant}` must include the same header used by JSON APIs:
+
+```http
+Authorization: Bearer <accessToken>
+```
+
+Photo and intro video uploads return `202 Accepted` while processing continues. The upload response may only include `original` at first. Use the local picked file or the returned `original` URL for the owner's immediate preview, and switch to `display` or `thumbnail` after `GET /api/v1/profile/media/me` shows those variants.
 
 ## Location And Discovery Preferences
 
@@ -491,6 +502,89 @@ Entitlements response:
 }
 ```
 
+## Admin Panel MVP
+
+Admin APIs use separate admin JWTs. A normal mobile user token must never be used for `/api/v1/admin/*`.
+
+Admin auth endpoints:
+
+```text
+POST /api/v1/admin/auth/login
+POST /api/v1/admin/auth/refresh-token
+POST /api/v1/admin/auth/logout
+GET  /api/v1/admin/auth/me
+POST /api/v1/admin/auth/change-password
+```
+
+Login:
+
+```json
+{
+  "email": "admin@example.com",
+  "password": "admin-password"
+}
+```
+
+Change password:
+
+```json
+{
+  "currentPassword": "old-admin-password",
+  "newPassword": "new-admin-password"
+}
+```
+
+Changing an admin password revokes all admin sessions. The frontend should clear admin tokens and redirect to login.
+
+Manual payment review endpoints:
+
+```text
+GET  /api/v1/admin/subscriptions/payment-requests?status=PENDING
+GET  /api/v1/admin/subscriptions/payment-requests/{paymentRequestUuid}
+POST /api/v1/admin/subscriptions/payment-requests/{paymentRequestUuid}/approve
+POST /api/v1/admin/subscriptions/payment-requests/{paymentRequestUuid}/reject
+```
+
+Approve request:
+
+```json
+{
+  "note": "Reference matched bKash statement"
+}
+```
+
+Reject request:
+
+```json
+{
+  "reason": "Payment reference was not found"
+}
+```
+
+Payment review APIs require admin JWT plus payment review permissions. Approval activates or extends the user's subscription and writes audit data.
+
+Audit log endpoints:
+
+```text
+GET /api/v1/admin/audit-logs
+GET /api/v1/admin/audit-logs/{auditLogUuid}
+```
+
+Audit list filters:
+
+```text
+adminUserUuid
+action
+resourceType
+resourceUuid
+createdFrom
+createdTo
+limit
+cursor
+```
+
+Audit log APIs require `audit.read`.
+
 ## Privacy Rules For Mobile
 
 Never expect these in public/mobile profile responses:
@@ -523,4 +617,3 @@ Recommended client behavior:
 ```
 
 Daily premium usage limits reset by UTC date.
-

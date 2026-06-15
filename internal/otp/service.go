@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/google/uuid"
@@ -124,10 +125,13 @@ func (s *Service) Request(ctx context.Context, input RequestInput) (*OTPCode, er
 		return nil, err
 	}
 
-	if _, err := s.queue.EnqueueContext(ctx, task, DeliveryTaskOptions()...); err != nil {
+	taskInfo, err := s.queue.EnqueueContext(ctx, task, DeliveryTaskOptions()...)
+	if err != nil {
 		_ = s.markDeliveryFailed(ctx, otpCode.ID, err.Error())
+		log.Printf("[OTP] enqueue_failed channel=%s purpose=%s identifier_hash=%s error=%v", channel, purpose, shortHash(identifierHash), err)
 		return nil, fmt.Errorf("enqueue otp delivery: %w", err)
 	}
+	log.Printf("[OTP] queued channel=%s purpose=%s identifier_hash=%s otp_id=%s task_id=%s queue=%s", channel, purpose, shortHash(identifierHash), otpCode.UUID.String(), taskInfo.ID, taskInfo.Queue)
 
 	if err := s.db.WithContext(ctx).Model(&OTPCode{}).
 		Where("id = ?", otpCode.ID).
@@ -156,6 +160,13 @@ func (s *Service) Verify(ctx context.Context, input VerifyInput) (*OTPCode, erro
 		return nil, err
 	}
 	if input.Code == "" {
+		return nil, ErrInvalidCode
+	}
+	if s.cfg.DevBypassEnabled && input.Code == s.cfg.DevBypassCode {
+		log.Printf("[OTP] dev_bypass_verify channel=%s purpose=%s identifier_hash=%s", channel, purpose, shortHash(HashIdentifier(s.cfg.Secret, identifier)))
+		return devBypassOTPCode(channel, purpose, identifier), nil
+	}
+	if s.db == nil {
 		return nil, ErrInvalidCode
 	}
 
@@ -212,17 +223,27 @@ func (s *Service) enforceRateLimits(ctx context.Context, identifierHash, ip stri
 		return fmt.Errorf("otp cooldown rate limit: %w", err)
 	}
 	if !ok {
+		ttl := s.redis.TTL(ctx, cooldownKey).Val()
+		log.Printf("[OTP] rate_limited reason=cooldown identifier_hash=%s retry_after=%s", shortHash(identifierHash), ttl)
 		return ErrRateLimited
 	}
 
 	identifierHourKey := "rl:otp:identifier:hour:" + identifierHash
-	if err := incrementWindow(ctx, s.redis, identifierHourKey, time.Hour, s.cfg.MaxPerIdentifierHour); err != nil {
+	identifierCount, err := incrementWindow(ctx, s.redis, identifierHourKey, time.Hour, s.cfg.MaxPerIdentifierHour)
+	if err != nil {
+		if errors.Is(err, ErrRateLimited) {
+			log.Printf("[OTP] rate_limited reason=identifier_hour identifier_hash=%s count=%d max=%d", shortHash(identifierHash), identifierCount, s.cfg.MaxPerIdentifierHour)
+		}
 		return err
 	}
 
 	if ip != "" {
 		ipHourKey := "rl:otp:ip:hour:" + ip
-		if err := incrementWindow(ctx, s.redis, ipHourKey, time.Hour, s.cfg.MaxPerIPHour); err != nil {
+		ipCount, err := incrementWindow(ctx, s.redis, ipHourKey, time.Hour, s.cfg.MaxPerIPHour)
+		if err != nil {
+			if errors.Is(err, ErrRateLimited) {
+				log.Printf("[OTP] rate_limited reason=ip_hour ip=%s count=%d max=%d", ip, ipCount, s.cfg.MaxPerIPHour)
+			}
 			return err
 		}
 	}
@@ -230,18 +251,18 @@ func (s *Service) enforceRateLimits(ctx context.Context, identifierHash, ip stri
 	return nil
 }
 
-func incrementWindow(ctx context.Context, client *goredis.Client, key string, ttl time.Duration, max int) error {
+func incrementWindow(ctx context.Context, client *goredis.Client, key string, ttl time.Duration, max int) (int64, error) {
 	count, err := client.Incr(ctx, key).Result()
 	if err != nil {
-		return fmt.Errorf("increment rate limit: %w", err)
+		return 0, fmt.Errorf("increment rate limit: %w", err)
 	}
 	if count == 1 {
 		_ = client.Expire(ctx, key, ttl).Err()
 	}
 	if max > 0 && count > int64(max) {
-		return ErrRateLimited
+		return count, ErrRateLimited
 	}
-	return nil
+	return count, nil
 }
 
 func (s *Service) markDeliveryFailed(ctx context.Context, id uint64, message string) error {
@@ -258,4 +279,30 @@ func (s *Service) markDeliveryFailed(ctx context.Context, id uint64, message str
 
 func stringPtr(value string) *string {
 	return &value
+}
+
+func devBypassOTPCode(channel, purpose, identifier string) *OTPCode {
+	now := time.Now().UTC()
+	code := &OTPCode{
+		UUID:           uuid.New(),
+		Channel:        channel,
+		Purpose:        purpose,
+		DeliveryStatus: DeliverySent,
+		ConsumedAt:     &now,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+	if channel == ChannelWhatsApp {
+		code.Phone = stringPtr(identifier)
+	} else {
+		code.Email = stringPtr(identifier)
+	}
+	return code
+}
+
+func shortHash(value string) string {
+	if len(value) <= 12 {
+		return value
+	}
+	return value[:12]
 }
