@@ -9,8 +9,9 @@ import (
 )
 
 const (
-	defaultAuditLogLimit = 50
-	maxAuditLogLimit     = 100
+	defaultAuditLogLimit  = 50
+	maxAuditLogLimit      = 100
+	maxAnalyticsRangeDays = 366
 )
 
 type auditLogCursor struct {
@@ -63,6 +64,52 @@ func normalizeAuditLogLimit(raw string) (int, error) {
 		return maxAuditLogLimit, nil
 	}
 	return value, nil
+}
+
+func normalizeAnalyticsRange(fromRaw string, toRaw string, now time.Time) (AnalyticsPeriod, error) {
+	now = now.UTC()
+	defaultTo := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC).AddDate(0, 0, 1)
+	defaultFrom := defaultTo.AddDate(0, 0, -30)
+
+	from := defaultFrom
+	to := defaultTo
+	var err error
+	if strings.TrimSpace(fromRaw) != "" {
+		from, err = parseAnalyticsDate(fromRaw, "from")
+		if err != nil {
+			return AnalyticsPeriod{}, err
+		}
+	}
+	if strings.TrimSpace(toRaw) != "" {
+		to, err = parseAnalyticsDate(toRaw, "to")
+		if err != nil {
+			return AnalyticsPeriod{}, err
+		}
+	}
+	if !from.Before(to) {
+		return AnalyticsPeriod{}, analyticsRangeError("from must be before to")
+	}
+	if to.Sub(from) > maxAnalyticsRangeDays*24*time.Hour {
+		return AnalyticsPeriod{}, analyticsRangeError("Date range cannot exceed 366 days")
+	}
+	return AnalyticsPeriod{From: from, To: to}, nil
+}
+
+func parseAnalyticsDate(raw string, field string) (time.Time, error) {
+	parsed, err := time.Parse("2006-01-02", strings.TrimSpace(raw))
+	if err != nil {
+		return time.Time{}, &ServiceError{
+			Status:  400,
+			Code:    CodeAdminAnalyticsRangeInvalid,
+			Message: field + " must use YYYY-MM-DD",
+			Details: map[string]any{"field": field},
+		}
+	}
+	return parsed.UTC(), nil
+}
+
+func analyticsRangeError(message string) *ServiceError {
+	return &ServiceError{Status: 400, Code: CodeAdminAnalyticsRangeInvalid, Message: message}
 }
 
 func encodeAdminUserListCursor(cursor adminUserListCursor) (string, error) {

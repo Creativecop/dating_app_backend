@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_manual_payment_requests_reviewed_at;
+DROP INDEX IF EXISTS idx_manual_payment_requests_plan_created;
+DROP INDEX IF EXISTS idx_manual_payment_requests_provider_created;
+DROP INDEX IF EXISTS idx_manual_payment_requests_status_submitted;
+DROP INDEX IF EXISTS idx_admin_audit_logs_action_created;
+DROP INDEX IF EXISTS idx_reports_reason_created;
+DROP INDEX IF EXISTS idx_reports_status_created;
+DROP INDEX IF EXISTS idx_user_restrictions_created_by_created;
+DROP INDEX IF EXISTS idx_user_restrictions_status_type_created;

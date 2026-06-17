@@ -21,12 +21,18 @@ func TestRolePermissionMatrix(t *testing.T) {
 		disallowed string
 	}{
 		{RoleFinanceAdmin, PermissionWalletAdjust, PermissionRolesManage},
+		{RoleFinanceAdmin, PermissionAnalyticsSubscriptionPaymentsRead, PermissionAnalyticsReportsRead},
+		{RoleFinanceAdmin, PermissionPaymentRequestsRead, PermissionAuditRead},
 		{RoleTrustSafety, PermissionCommentsModerate, PermissionWalletAdjust},
+		{RoleTrustSafety, PermissionAnalyticsReportsRead, PermissionAnalyticsSubscriptionPaymentsRead},
+		{RoleTrustSafety, PermissionAnalyticsRestrictionsRead, PermissionAuditRead},
 		{RoleSupportAgent, PermissionReportsReview, PermissionCommentsModerate},
+		{RoleSupportAgent, PermissionUsersRead, PermissionAuditRead},
 		{RoleGiftManager, PermissionGiftsManage, PermissionAgencyManage},
 		{RoleAgencyManager, PermissionAgencyManage, PermissionGiftsManage},
 		{RoleResellerManager, PermissionResellerAllocate, PermissionWalletAdjust},
 		{RoleAnalyst, PermissionAnalyticsRead, PermissionUsersRead},
+		{RoleAnalyst, PermissionAnalyticsSubscriptionPaymentsRead, PermissionPaymentRequestsRead},
 	}
 
 	for _, test := range tests {

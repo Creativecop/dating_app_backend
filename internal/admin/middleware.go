@@ -40,6 +40,10 @@ func Auth(service Authenticator) gin.HandlerFunc {
 }
 
 func RequirePermission(service Authenticator, permission string) gin.HandlerFunc {
+	return RequirePermissionCode(service, permission, CodePermissionDenied)
+}
+
+func RequirePermissionCode(service Authenticator, permission string, code string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		adminUser, ok := CurrentAdmin(c)
 		if !ok {
@@ -54,11 +58,40 @@ func RequirePermission(service Authenticator, permission string) gin.HandlerFunc
 			return
 		}
 		if !allowed {
-			response.Error(c, 403, "Permission denied", CodePermissionDenied, nil)
+			response.Error(c, 403, "Permission denied", code, nil)
 			c.Abort()
 			return
 		}
 		c.Next()
+	}
+}
+
+func RequireAnyPermission(service Authenticator, permissions ...string) gin.HandlerFunc {
+	return RequireAnyPermissionCode(service, CodePermissionDenied, permissions...)
+}
+
+func RequireAnyPermissionCode(service Authenticator, code string, permissions ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		adminUser, ok := CurrentAdmin(c)
+		if !ok {
+			response.Error(c, 401, "Unauthorized", CodeUnauthorized, nil)
+			c.Abort()
+			return
+		}
+		for _, permission := range permissions {
+			allowed, err := service.HasPermission(c.Request.Context(), adminUser.AdminUserID, permission)
+			if err != nil {
+				response.Internal(c)
+				c.Abort()
+				return
+			}
+			if allowed {
+				c.Next()
+				return
+			}
+		}
+		response.Error(c, 403, "Permission denied", code, nil)
+		c.Abort()
 	}
 }
 

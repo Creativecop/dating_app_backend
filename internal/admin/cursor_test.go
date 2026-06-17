@@ -39,3 +39,27 @@ func TestNormalizeAuditLogLimit(t *testing.T) {
 		t.Fatal("expected zero limit to fail")
 	}
 }
+
+func TestNormalizeAnalyticsRangeDefaultUTCWindow(t *testing.T) {
+	now := time.Date(2026, 6, 17, 18, 30, 0, 0, time.UTC)
+	period, err := normalizeAnalyticsRange("", "", now)
+	if err != nil {
+		t.Fatalf("normalizeAnalyticsRange returned error: %v", err)
+	}
+	wantFrom := time.Date(2026, 5, 19, 0, 0, 0, 0, time.UTC)
+	wantTo := time.Date(2026, 6, 18, 0, 0, 0, 0, time.UTC)
+	if !period.From.Equal(wantFrom) || !period.To.Equal(wantTo) {
+		t.Fatalf("period = %s..%s, want %s..%s", period.From, period.To, wantFrom, wantTo)
+	}
+}
+
+func TestNormalizeAnalyticsRangeRejectsOverMax(t *testing.T) {
+	_, err := normalizeAnalyticsRange("2025-01-01", "2026-01-03", time.Date(2026, 6, 17, 0, 0, 0, 0, time.UTC))
+	if err == nil {
+		t.Fatal("expected over-max range to fail")
+	}
+	serviceErr, ok := AsServiceError(err)
+	if !ok || serviceErr.Code != CodeAdminAnalyticsRangeInvalid {
+		t.Fatalf("err = %#v, want %s", err, CodeAdminAnalyticsRangeInvalid)
+	}
+}

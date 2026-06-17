@@ -100,6 +100,20 @@ func (h *Handler) Capabilities(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Admin capabilities fetched successfully", result)
 }
 
+func (h *Handler) DashboardSummary(c *gin.Context) {
+	adminUser, ok := CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", CodeUnauthorized, nil)
+		return
+	}
+	result, err := h.service.DashboardSummary(c.Request.Context(), adminUser.AdminUserID)
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Dashboard summary fetched successfully", result)
+}
+
 func (h *Handler) ListRoles(c *gin.Context) {
 	result, err := h.service.ListRoles(c.Request.Context())
 	if err != nil {
@@ -277,14 +291,19 @@ func (h *Handler) RevokeUserRestriction(c *gin.Context) {
 
 func (h *Handler) ListAuditLogs(c *gin.Context) {
 	result, err := h.service.ListAuditLogs(c.Request.Context(), AuditLogListQuery{
-		AdminUserUUID: c.Query("adminUserUuid"),
-		Action:        c.Query("action"),
-		ResourceType:  c.Query("resourceType"),
-		ResourceUUID:  c.Query("resourceUuid"),
-		CreatedFrom:   c.Query("createdFrom"),
-		CreatedTo:     c.Query("createdTo"),
-		Limit:         c.Query("limit"),
-		Cursor:        c.Query("cursor"),
+		AdminUserUUID:      c.Query("adminUserUuid"),
+		ActorAdminUserID:   c.Query("actorAdminUserId"),
+		ActorAdminUserUUID: c.Query("actorAdminUserUuid"),
+		Action:             c.Query("action"),
+		ActionType:         c.Query("actionType"),
+		ResourceType:       c.Query("resourceType"),
+		ResourceUUID:       c.Query("resourceUuid"),
+		CreatedFrom:        c.Query("createdFrom"),
+		CreatedTo:          c.Query("createdTo"),
+		From:               c.Query("from"),
+		To:                 c.Query("to"),
+		Limit:              c.Query("limit"),
+		Cursor:             c.Query("cursor"),
 	})
 	if err != nil {
 		h.writeError(c, err)
@@ -302,6 +321,60 @@ func (h *Handler) AuditLogDetail(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Audit log fetched successfully", result)
 }
 
+func (h *Handler) UserAnalytics(c *gin.Context) {
+	result, err := h.service.UserAnalytics(c.Request.Context(), analyticsQuery(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "User analytics fetched successfully", result)
+}
+
+func (h *Handler) ReportAnalytics(c *gin.Context) {
+	result, err := h.service.ReportAnalytics(c.Request.Context(), analyticsQuery(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Report analytics fetched successfully", result)
+}
+
+func (h *Handler) RestrictionAnalytics(c *gin.Context) {
+	result, err := h.service.RestrictionAnalytics(c.Request.Context(), analyticsQuery(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Restriction analytics fetched successfully", result)
+}
+
+func (h *Handler) TrustSafetyAnalytics(c *gin.Context) {
+	result, err := h.service.TrustSafetyAnalytics(c.Request.Context(), analyticsQuery(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Trust and Safety analytics fetched successfully", result)
+}
+
+func (h *Handler) AdminActivityAnalytics(c *gin.Context) {
+	result, err := h.service.AdminActivityAnalytics(c.Request.Context(), analyticsQuery(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Admin activity analytics fetched successfully", result)
+}
+
+func (h *Handler) SubscriptionPaymentAnalytics(c *gin.Context) {
+	result, err := h.service.SubscriptionPaymentAnalytics(c.Request.Context(), analyticsQuery(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Subscription payment analytics fetched successfully", result)
+}
+
 func (h *Handler) writeError(c *gin.Context, err error) {
 	if serviceErr, ok := AsServiceError(err); ok {
 		response.Error(c, serviceErr.Status, serviceErr.Message, serviceErr.Code, serviceErr.Details)
@@ -316,4 +389,8 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 
 func requestMeta(c *gin.Context) RequestMeta {
 	return RequestMeta{IPAddress: c.ClientIP(), UserAgent: c.Request.UserAgent()}
+}
+
+func analyticsQuery(c *gin.Context) AnalyticsQuery {
+	return AnalyticsQuery{From: c.Query("from"), To: c.Query("to")}
 }

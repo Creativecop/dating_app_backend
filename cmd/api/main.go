@@ -117,14 +117,16 @@ func main() {
 	chatHandler.SetRestrictionChecker(restrictionService)
 	adminService.SetUserSocketDisconnecter(chatHub)
 	adminService.SetModuleCapabilities(admin.AdminModuleCapabilities{
-		TrustSafety:    true,
-		Wallet:         false,
-		Gift:           false,
-		Agency:         false,
-		Reseller:       false,
-		Live:           false,
-		LiveComments:   false,
-		ChatModeration: false,
+		TrustSafety:                  true,
+		SubscriptionPayments:         true,
+		SubscriptionPaymentAnalytics: true,
+		Wallet:                       false,
+		Gift:                         false,
+		Agency:                       false,
+		Reseller:                     false,
+		Live:                         false,
+		LiveComments:                 false,
+		ChatModeration:               false,
 	})
 	notificationHandler := notification.NewHandler(notificationService)
 	safetyHandler := safety.NewHandler(safetyService)

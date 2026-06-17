@@ -22,8 +22,30 @@ func RegisterRoutes(v1 *gin.RouterGroup, service *Service, handler *Handler) {
 	capabilityRoutes.Use(Auth(service), RequirePasswordReady())
 	capabilityRoutes.GET("", handler.Capabilities)
 
+	dashboardRoutes := adminGroup.Group("/dashboard")
+	dashboardRoutes.Use(Auth(service), RequirePasswordReady(), RequireAnyPermissionCode(
+		service,
+		CodeAdminAnalyticsAccessDenied,
+		PermissionAnalyticsRead,
+		PermissionAnalyticsReportsRead,
+		PermissionAnalyticsRestrictionsRead,
+		PermissionAnalyticsTrustSafetyRead,
+		PermissionAnalyticsAdminActivityRead,
+		PermissionAnalyticsSubscriptionPaymentsRead,
+	))
+	dashboardRoutes.GET("/summary", handler.DashboardSummary)
+
+	analyticsRoutes := adminGroup.Group("/analytics")
+	analyticsRoutes.Use(Auth(service), RequirePasswordReady())
+	analyticsRoutes.GET("/users", RequirePermissionCode(service, PermissionAnalyticsRead, CodeAdminAnalyticsAccessDenied), handler.UserAnalytics)
+	analyticsRoutes.GET("/reports", RequireAnyPermissionCode(service, CodeAdminAnalyticsAccessDenied, PermissionAnalyticsRead, PermissionAnalyticsReportsRead, PermissionAnalyticsTrustSafetyRead), handler.ReportAnalytics)
+	analyticsRoutes.GET("/restrictions", RequireAnyPermissionCode(service, CodeAdminAnalyticsAccessDenied, PermissionAnalyticsRead, PermissionAnalyticsRestrictionsRead, PermissionAnalyticsTrustSafetyRead), handler.RestrictionAnalytics)
+	analyticsRoutes.GET("/trust-safety", RequireAnyPermissionCode(service, CodeAdminAnalyticsAccessDenied, PermissionAnalyticsTrustSafetyRead, PermissionAnalyticsRead), handler.TrustSafetyAnalytics)
+	analyticsRoutes.GET("/admin-activity", RequireAnyPermissionCode(service, CodeAdminAnalyticsAccessDenied, PermissionAnalyticsRead, PermissionAnalyticsAdminActivityRead), handler.AdminActivityAnalytics)
+	analyticsRoutes.GET("/subscription-payments", RequirePermissionCode(service, PermissionAnalyticsSubscriptionPaymentsRead, CodeAdminAnalyticsAccessDenied), handler.SubscriptionPaymentAnalytics)
+
 	auditRoutes := adminGroup.Group("/audit-logs")
-	auditRoutes.Use(Auth(service), RequirePasswordReady(), RequirePermission(service, PermissionAuditRead))
+	auditRoutes.Use(Auth(service), RequirePasswordReady(), RequirePermissionCode(service, PermissionAuditRead, CodeAdminAuditAccessDenied))
 	auditRoutes.GET("", handler.ListAuditLogs)
 	auditRoutes.GET("/:auditLogUuid", handler.AuditLogDetail)
 

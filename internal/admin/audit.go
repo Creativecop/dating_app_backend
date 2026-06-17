@@ -28,6 +28,11 @@ type auditLogRow struct {
 }
 
 func (s *Service) ListAuditLogs(ctx context.Context, query AuditLogListQuery) (*AuditLogListResponse, error) {
+	normalized, err := normalizeAuditLogListQuery(query)
+	if err != nil {
+		return nil, err
+	}
+	query = normalized
 	limit, err := normalizeAuditLogLimit(query.Limit)
 	if err != nil {
 		return nil, err
@@ -118,13 +123,61 @@ func (s *Service) AuditLogDetail(ctx context.Context, auditLogUUID string) (*Aud
 		return nil, err
 	}
 	if len(rows) == 0 {
-		return nil, notFoundError("Audit log not found")
+		return nil, &ServiceError{Status: 404, Code: CodeAdminAuditLogNotFound, Message: "Audit log not found"}
 	}
 	response, err := rows[0].toResponse()
 	if err != nil {
 		return nil, err
 	}
 	return &response, nil
+}
+
+func normalizeAuditLogListQuery(query AuditLogListQuery) (AuditLogListQuery, error) {
+	adminUserUUID, err := mergeAuditFilter("adminUserUuid", query.AdminUserUUID, "actorAdminUserId", query.ActorAdminUserID)
+	if err != nil {
+		return AuditLogListQuery{}, err
+	}
+	adminUserUUID, err = mergeAuditFilter("adminUserUuid", adminUserUUID, "actorAdminUserUuid", query.ActorAdminUserUUID)
+	if err != nil {
+		return AuditLogListQuery{}, err
+	}
+	action, err := mergeAuditFilter("action", query.Action, "actionType", query.ActionType)
+	if err != nil {
+		return AuditLogListQuery{}, err
+	}
+	createdFrom, err := mergeAuditFilter("createdFrom", query.CreatedFrom, "from", query.From)
+	if err != nil {
+		return AuditLogListQuery{}, err
+	}
+	createdTo, err := mergeAuditFilter("createdTo", query.CreatedTo, "to", query.To)
+	if err != nil {
+		return AuditLogListQuery{}, err
+	}
+	query.AdminUserUUID = adminUserUUID
+	query.Action = action
+	query.CreatedFrom = createdFrom
+	query.CreatedTo = createdTo
+	return query, nil
+}
+
+func mergeAuditFilter(canonicalName string, canonicalValue string, aliasName string, aliasValue string) (string, error) {
+	canonicalValue = strings.TrimSpace(canonicalValue)
+	aliasValue = strings.TrimSpace(aliasValue)
+	if canonicalValue == "" {
+		return aliasValue, nil
+	}
+	if aliasValue == "" || canonicalValue == aliasValue {
+		return canonicalValue, nil
+	}
+	return "", &ServiceError{
+		Status:  400,
+		Code:    CodeAdminAuditFilterConflict,
+		Message: "Conflicting audit log filters",
+		Details: map[string]any{
+			"canonical": canonicalName,
+			"alias":     aliasName,
+		},
+	}
 }
 
 func (s *Service) auditLogRows(ctx context.Context, where string, args ...any) ([]auditLogRow, error) {
