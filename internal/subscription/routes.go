@@ -20,7 +20,7 @@ func RegisterRoutes(v1 *gin.RouterGroup, authMiddleware gin.HandlerFunc, handler
 
 func RegisterAdminRoutes(v1 *gin.RouterGroup, adminService *admin.Service, handler *Handler) {
 	routes := v1.Group("/admin/subscriptions/payment-requests")
-	routes.Use(admin.Auth(adminService))
+	routes.Use(admin.Auth(adminService), admin.RequirePasswordReady())
 
 	routes.GET("",
 		admin.RequirePermission(adminService, admin.PermissionPaymentRequestsRead),

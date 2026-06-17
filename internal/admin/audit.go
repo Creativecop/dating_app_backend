@@ -15,9 +15,11 @@ type auditLogRow struct {
 	AuditLogUUID      string
 	AdminUserUUID     *string
 	AdminEmail        *string
+	ActorType         string
 	Action            string
 	ResourceType      string
 	ResourceUUID      *string
+	Reason            *string
 	BeforeSnapshotRaw string
 	AfterSnapshotRaw  string
 	IPAddress         *string
@@ -132,9 +134,11 @@ func (s *Service) auditLogRows(ctx context.Context, where string, args ...any) (
 		  al.uuid::text AS audit_log_uuid,
 		  au.uuid::text AS admin_user_uuid,
 		  au.email AS admin_email,
+		  al.actor_type,
 		  al.action,
 		  al.resource_type,
 		  al.resource_uuid::text AS resource_uuid,
+		  al.reason,
 		  al.before_snapshot::text AS before_snapshot_raw,
 		  al.after_snapshot::text AS after_snapshot_raw,
 		  al.ip_address,
@@ -164,9 +168,11 @@ func (row auditLogRow) toResponse() (AuditLogResponse, error) {
 		AuditLogUUID:   row.AuditLogUUID,
 		AdminUserUUID:  row.AdminUserUUID,
 		AdminEmail:     row.AdminEmail,
+		ActorType:      row.ActorType,
 		Action:         row.Action,
 		ResourceType:   row.ResourceType,
 		ResourceUUID:   row.ResourceUUID,
+		Reason:         row.Reason,
 		BeforeSnapshot: before,
 		AfterSnapshot:  after,
 		IPAddress:      row.IPAddress,
@@ -175,7 +181,7 @@ func (row auditLogRow) toResponse() (AuditLogResponse, error) {
 	}, nil
 }
 
-func insertAdminAuditLogTx(ctx context.Context, tx *gorm.DB, adminID uint64, action, resourceType string, resourceUUID *uuid.UUID, before any, after any, meta RequestMeta) error {
+func insertAdminAuditLogTx(ctx context.Context, tx *gorm.DB, adminID *uint64, actorType string, action string, resourceType string, resourceUUID *uuid.UUID, reason *string, before any, after any, meta RequestMeta) error {
 	beforeJSON, err := json.Marshal(before)
 	if err != nil {
 		return err
@@ -187,16 +193,18 @@ func insertAdminAuditLogTx(ctx context.Context, tx *gorm.DB, adminID uint64, act
 	return tx.WithContext(ctx).Exec(`
 		INSERT INTO admin_audit_logs (
 		  admin_user_id,
+		  actor_type,
 		  action,
 		  resource_type,
 		  resource_uuid,
+		  reason,
 		  before_snapshot,
 		  after_snapshot,
 		  ip_address,
 		  user_agent
 		)
-		VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
-	`, adminID, action, resourceType, resourceUUID, string(beforeJSON), string(afterJSON), meta.IPAddress, meta.UserAgent).Error
+		VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
+	`, adminID, actorType, action, resourceType, resourceUUID, reason, string(beforeJSON), string(afterJSON), meta.IPAddress, meta.UserAgent).Error
 }
 
 func minInt(a, b int) int {

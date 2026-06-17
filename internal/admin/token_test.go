@@ -21,7 +21,7 @@ func TestAdminAccessTokenIncludesTokenVersion(t *testing.T) {
 		UUID:         uuid.New(),
 		Email:        "admin@example.com",
 		TokenVersion: 3,
-	}, AdminSession{UUID: uuid.New()})
+	}, AdminSession{UUID: uuid.New()}, []string{RoleSuperAdmin})
 	if err != nil {
 		t.Fatalf("GenerateAccessToken returned error: %v", err)
 	}
@@ -31,6 +31,12 @@ func TestAdminAccessTokenIncludesTokenVersion(t *testing.T) {
 	}
 	if claims.TokenVersion != 3 {
 		t.Fatalf("TokenVersion = %d, want 3", claims.TokenVersion)
+	}
+	if claims.TokenType != "admin_access" {
+		t.Fatalf("TokenType = %q, want admin_access", claims.TokenType)
+	}
+	if len(claims.Roles) != 1 || claims.Roles[0] != RoleSuperAdmin {
+		t.Fatalf("Roles = %#v, want SUPER_ADMIN", claims.Roles)
 	}
 }
 

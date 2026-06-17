@@ -62,6 +62,23 @@ func RequirePermission(service Authenticator, permission string) gin.HandlerFunc
 	}
 }
 
+func RequirePasswordReady() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		adminUser, ok := CurrentAdmin(c)
+		if !ok {
+			response.Error(c, 401, "Unauthorized", CodeUnauthorized, nil)
+			c.Abort()
+			return
+		}
+		if adminUser.Status == StatusInvited || adminUser.MustChangePassword {
+			response.Error(c, 403, "Password change required", CodePasswordChangeRequired, nil)
+			c.Abort()
+			return
+		}
+		c.Next()
+	}
+}
+
 func CurrentAdmin(c *gin.Context) (AuthenticatedAdmin, bool) {
 	value, ok := c.Get(ContextAdminKey)
 	if !ok {

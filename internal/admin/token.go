@@ -19,9 +19,11 @@ type TokenService struct {
 }
 
 type AccessClaims struct {
-	SessionID    string `json:"sid"`
-	Email        string `json:"email"`
-	TokenVersion int    `json:"tokenVersion"`
+	TokenType    string   `json:"tokenType"`
+	SessionID    string   `json:"sid"`
+	Email        string   `json:"email"`
+	Roles        []string `json:"roles"`
+	TokenVersion int      `json:"tokenVersion"`
 	jwt.RegisteredClaims
 }
 
@@ -29,11 +31,13 @@ func NewTokenService(cfg config.JWTConfig) *TokenService {
 	return &TokenService{cfg: cfg}
 }
 
-func (s *TokenService) GenerateAccessToken(user AdminUser, session AdminSession) (string, error) {
+func (s *TokenService) GenerateAccessToken(user AdminUser, session AdminSession, roles []string) (string, error) {
 	now := time.Now().UTC()
 	claims := AccessClaims{
+		TokenType:    "admin_access",
 		SessionID:    session.UUID.String(),
 		Email:        user.Email,
+		Roles:        roles,
 		TokenVersion: user.TokenVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:   user.UUID.String(),

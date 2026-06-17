@@ -9,14 +9,30 @@ func RegisterRoutes(v1 *gin.RouterGroup, service *Service, handler *Handler) {
 	authRoutes.POST("/login", handler.Login)
 	authRoutes.POST("/refresh-token", handler.RefreshToken)
 
+	passwordRoutes := authRoutes.Group("")
+	passwordRoutes.Use(Auth(service))
+	passwordRoutes.POST("/change-password", handler.ChangePassword)
+
 	protected := authRoutes.Group("")
-	protected.Use(Auth(service))
+	protected.Use(Auth(service), RequirePasswordReady())
 	protected.POST("/logout", handler.Logout)
 	protected.GET("/me", handler.Me)
-	protected.POST("/change-password", handler.ChangePassword)
 
 	auditRoutes := adminGroup.Group("/audit-logs")
-	auditRoutes.Use(Auth(service), RequirePermission(service, PermissionAuditRead))
+	auditRoutes.Use(Auth(service), RequirePasswordReady(), RequirePermission(service, PermissionAuditRead))
 	auditRoutes.GET("", handler.ListAuditLogs)
 	auditRoutes.GET("/:auditLogUuid", handler.AuditLogDetail)
+
+	roleRoutes := adminGroup.Group("/roles")
+	roleRoutes.Use(Auth(service), RequirePasswordReady(), RequirePermission(service, PermissionRolesManage))
+	roleRoutes.GET("", handler.ListRoles)
+
+	adminUserRoutes := adminGroup.Group("/admin-users")
+	adminUserRoutes.Use(Auth(service), RequirePasswordReady())
+	adminUserRoutes.GET("", RequirePermission(service, PermissionAdminUsersRead), handler.ListAdminUsers)
+	adminUserRoutes.POST("", RequirePermission(service, PermissionAdminUsersCreate), handler.CreateAdminUser)
+	adminUserRoutes.GET("/:adminUserUuid", RequirePermission(service, PermissionAdminUsersRead), handler.AdminUserDetail)
+	adminUserRoutes.POST("/:adminUserUuid/roles", RequirePermission(service, PermissionRolesManage), handler.AssignAdminRole)
+	adminUserRoutes.DELETE("/:adminUserUuid/roles/:role", RequirePermission(service, PermissionRolesManage), handler.RemoveAdminRole)
+	adminUserRoutes.PATCH("/:adminUserUuid/status", RequirePermission(service, PermissionAdminUsersManage), handler.UpdateAdminStatus)
 }

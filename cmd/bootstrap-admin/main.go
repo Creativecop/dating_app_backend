@@ -19,25 +19,10 @@ import (
 )
 
 func main() {
-	if len(os.Args) < 2 {
-		usage()
-		os.Exit(2)
-	}
-
-	switch os.Args[1] {
-	case "create-super-admin":
-		createSuperAdmin(os.Args[2:])
-	default:
-		usage()
-		os.Exit(2)
-	}
-}
-
-func createSuperAdmin(args []string) {
-	flags := flag.NewFlagSet("create-super-admin", flag.ExitOnError)
+	flags := flag.NewFlagSet("bootstrap-admin", flag.ExitOnError)
 	email := flags.String("email", "", "admin email")
 	name := flags.String("name", "", "admin display name")
-	if err := flags.Parse(args); err != nil {
+	if err := flags.Parse(os.Args[1:]); err != nil {
 		log.Fatal(err)
 	}
 	if strings.TrimSpace(*email) == "" {
@@ -71,18 +56,15 @@ func createSuperAdmin(args []string) {
 		Name:     *name,
 		Password: password,
 		Secret:   os.Getenv("BOOTSTRAP_ADMIN_SECRET"),
-	}, admin.RequestMeta{IPAddress: "bootstrap-cli", UserAgent: "cmd/admin"})
+	}, admin.RequestMeta{IPAddress: "bootstrap-cli", UserAgent: "bootstrap-cli"})
 	if err != nil {
-		log.Fatalf("create super admin: %v", err)
+		log.Fatalf("bootstrap super admin: %v", err)
 	}
-	fmt.Printf("Super admin created successfully: %s (%s).\n", result.Email, result.UUID)
+	fmt.Printf("Bootstrapped SUPER_ADMIN %s (%s).\n", result.Email, result.UUID)
 }
 
 func promptPassword() (string, error) {
 	if value := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_PASSWORD")); value != "" {
-		return value, nil
-	}
-	if value := strings.TrimSpace(os.Getenv("ADMIN_PASSWORD")); value != "" {
 		return value, nil
 	}
 	fmt.Print("Password: ")
@@ -117,10 +99,4 @@ func readPassword() (string, error) {
 		return "", err
 	}
 	return strings.TrimRight(value, "\r\n"), nil
-}
-
-func usage() {
-	fmt.Println("Usage:")
-	fmt.Println("  BOOTSTRAP_ADMIN_SECRET=strong_secret_min_32_chars go run ./cmd/admin create-super-admin --email admin@example.com --name \"Super Admin\"")
-	fmt.Println("  BOOTSTRAP_ADMIN_SECRET=strong_secret_min_32_chars go run ./cmd/bootstrap-admin --email admin@example.com --name \"Super Admin\"")
 }

@@ -506,6 +506,15 @@ Entitlements response:
 
 Admin APIs use separate admin JWTs. A normal mobile user token must never be used for `/api/v1/admin/*`.
 
+Bootstrap the first admin from CLI only:
+
+```bash
+BOOTSTRAP_ADMIN_SECRET=strong_secret_min_32_chars \
+go run ./cmd/bootstrap-admin --email=admin@example.com --name="Super Admin"
+```
+
+The bootstrap command prompts for a password unless `BOOTSTRAP_ADMIN_PASSWORD` is set. It works only while no active `SUPER_ADMIN` exists.
+
 Admin auth endpoints:
 
 ```text
@@ -535,6 +544,71 @@ Change password:
 ```
 
 Changing an admin password revokes all admin sessions. The frontend should clear admin tokens and redirect to login.
+
+Admins created by another admin start as `INVITED` with `mustChangePassword: true`. Invited admins can only call `POST /api/v1/admin/auth/change-password`; all other protected admin routes return `ADMIN_PASSWORD_CHANGE_REQUIRED` until the password is changed.
+
+Admin role and lifecycle endpoints:
+
+```text
+GET    /api/v1/admin/roles
+GET    /api/v1/admin/admin-users
+GET    /api/v1/admin/admin-users/{adminUserUuid}
+POST   /api/v1/admin/admin-users
+POST   /api/v1/admin/admin-users/{adminUserUuid}/roles
+DELETE /api/v1/admin/admin-users/{adminUserUuid}/roles/{role}
+PATCH  /api/v1/admin/admin-users/{adminUserUuid}/status
+```
+
+Create admin:
+
+```json
+{
+  "email": "ops@example.com",
+  "name": "Ops Manager",
+  "temporaryPassword": "TemporaryPassword@123",
+  "roles": ["OPS_MANAGER"],
+  "reason": "Ops team onboarding"
+}
+```
+
+If `temporaryPassword` is omitted, the API generates one and returns it once in the create response.
+
+Assign role:
+
+```json
+{
+  "role": "OPS_MANAGER",
+  "reason": "Coverage for live operations"
+}
+```
+
+Remove role:
+
+```json
+{
+  "reason": "Role no longer required"
+}
+```
+
+Update admin status:
+
+```json
+{
+  "status": "DISABLED",
+  "reason": "Left company"
+}
+```
+
+Admin statuses:
+
+```text
+INVITED  - can only change password
+ACTIVE   - normal admin access
+DISABLED - cannot log in
+LOCKED   - cannot log in until status changes
+```
+
+Role assignments are the authorization source of truth. `SUPER_ADMIN` grants all permissions, but lower roles cannot assign/remove `SUPER_ADMIN`, modify a `SUPER_ADMIN`, or remove/disable the last active `SUPER_ADMIN`.
 
 Manual payment review endpoints:
 
@@ -583,7 +657,7 @@ limit
 cursor
 ```
 
-Audit log APIs require `audit.read`.
+Audit log APIs require `admin.audit.read`.
 
 ## Privacy Rules For Mobile
 

@@ -15,11 +15,14 @@ type RequestMeta struct {
 }
 
 type AuthenticatedAdmin struct {
-	AdminUserID      uint64
-	AdminUserUUID    uuid.UUID
-	AdminSessionID   uint64
-	AdminSessionUUID uuid.UUID
-	Email            string
+	AdminUserID        uint64
+	AdminUserUUID      uuid.UUID
+	AdminSessionID     uint64
+	AdminSessionUUID   uuid.UUID
+	Email              string
+	Status             string
+	MustChangePassword bool
+	Roles              []string
 }
 
 type LoginRequest struct {
@@ -56,23 +59,67 @@ type TokenResponse struct {
 }
 
 type AdminUserResponse struct {
-	UUID        string     `json:"uuid"`
-	Email       string     `json:"email"`
-	Name        *string    `json:"name"`
-	Status      string     `json:"status"`
-	LastLoginAt *time.Time `json:"lastLoginAt"`
-	Permissions []string   `json:"permissions,omitempty"`
+	UUID               string     `json:"uuid"`
+	Email              string     `json:"email"`
+	Name               *string    `json:"name"`
+	Status             string     `json:"status"`
+	MustChangePassword bool       `json:"mustChangePassword"`
+	LastLoginAt        *time.Time `json:"lastLoginAt"`
+	Roles              []string   `json:"roles,omitempty"`
+	Permissions        []string   `json:"permissions,omitempty"`
 }
 
-func toAdminUserResponse(user AdminUser, permissions []string) AdminUserResponse {
+func toAdminUserResponse(user AdminUser, roles []string, permissions []string) AdminUserResponse {
 	return AdminUserResponse{
-		UUID:        user.UUID.String(),
-		Email:       user.Email,
-		Name:        user.Name,
-		Status:      user.Status,
-		LastLoginAt: user.LastLoginAt,
-		Permissions: permissions,
+		UUID:               user.UUID.String(),
+		Email:              user.Email,
+		Name:               user.Name,
+		Status:             user.Status,
+		MustChangePassword: user.MustChangePassword,
+		LastLoginAt:        user.LastLoginAt,
+		Roles:              roles,
+		Permissions:        permissions,
 	}
+}
+
+type RoleListResponse struct {
+	Items []RoleResponse `json:"items"`
+}
+
+type RoleResponse struct {
+	Role        string   `json:"role"`
+	Permissions []string `json:"permissions"`
+}
+
+type AdminUserListResponse struct {
+	Items []AdminUserResponse `json:"items"`
+}
+
+type CreateAdminUserRequest struct {
+	Email             string   `json:"email" binding:"required"`
+	Name              string   `json:"name"`
+	TemporaryPassword string   `json:"temporaryPassword"`
+	Roles             []string `json:"roles" binding:"required"`
+	Reason            string   `json:"reason" binding:"required"`
+}
+
+type CreateAdminUserResponse struct {
+	Admin             AdminUserResponse `json:"admin"`
+	TemporaryPassword *string           `json:"temporaryPassword,omitempty"`
+}
+
+type AssignRoleRequest struct {
+	Role   string `json:"role" binding:"required"`
+	Reason string `json:"reason" binding:"required"`
+}
+
+type RemoveRoleRequest struct {
+	Reason string `json:"reason" binding:"required"`
+}
+
+type UpdateAdminStatusRequest struct {
+	Status string `json:"status" binding:"required"`
+	Reason string `json:"reason" binding:"required"`
 }
 
 type AuditLogListQuery struct {
@@ -95,9 +142,11 @@ type AuditLogResponse struct {
 	AuditLogUUID   string          `json:"auditLogUuid"`
 	AdminUserUUID  *string         `json:"adminUserUuid"`
 	AdminEmail     *string         `json:"adminEmail"`
+	ActorType      string          `json:"actorType"`
 	Action         string          `json:"action"`
 	ResourceType   string          `json:"resourceType"`
 	ResourceUUID   *string         `json:"resourceUuid"`
+	Reason         *string         `json:"reason,omitempty"`
 	BeforeSnapshot json.RawMessage `json:"beforeSnapshot"`
 	AfterSnapshot  json.RawMessage `json:"afterSnapshot"`
 	IPAddress      *string         `json:"ipAddress"`

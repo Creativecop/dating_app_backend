@@ -3,7 +3,6 @@ package admin
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -39,11 +38,18 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, meta RequestMeta)
 		}
 		return nil, err
 	}
-	if user.Status != StatusActive {
+	if !loginAllowedStatus(user.Status) {
 		return nil, ErrInactiveAdmin
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
 		return nil, unauthorizedError()
+	}
+	roles, err := s.Roles(ctx, user.ID)
+	if err != nil {
+		return nil, err
+	}
+	if len(roles) == 0 {
+		return nil, forbiddenError(CodeRoleRequired, "Admin role required", nil)
 	}
 
 	now := time.Now().UTC()
@@ -59,20 +65,17 @@ func (s *Service) Login(ctx context.Context, req LoginRequest, meta RequestMeta)
 	}
 	user.LastLoginAt = &now
 
-	accessToken, err := s.tokens.GenerateAccessToken(user, *session)
+	accessToken, err := s.tokens.GenerateAccessToken(user, *session, roles)
 	if err != nil {
 		return nil, err
 	}
-	permissions, err := s.Permissions(ctx, user.ID)
-	if err != nil {
-		return nil, err
-	}
+	permissions := PermissionsForRoles(roles)
 	return &AuthResponse{
 		AccessToken:      accessToken,
 		RefreshToken:     refreshToken,
 		ExpiresIn:        int64(s.cfg.AccessTTL().Seconds()),
 		RefreshExpiresIn: int64(s.cfg.RefreshTTL().Seconds()),
-		Admin:            toAdminUserResponse(user, permissions),
+		Admin:            toAdminUserResponse(user, roles, permissions),
 	}, nil
 }
 
@@ -92,10 +95,17 @@ func (s *Service) RefreshToken(ctx context.Context, req RefreshTokenRequest, met
 			First(&session).Error; err != nil {
 			return ErrInvalidRefresh
 		}
-		if session.RevokedAt != nil || session.ExpiresAt.Before(now) || session.AdminUser.Status != StatusActive {
+		if session.RevokedAt != nil || session.ExpiresAt.Before(now) || !loginAllowedStatus(session.AdminUser.Status) {
 			return ErrInvalidRefresh
 		}
 		if !adminRefreshSessionStateValid(session.AdminUser, session.CreatedAt) {
+			return ErrInvalidRefresh
+		}
+		roles, err := s.rolesWithDB(ctx, tx, session.AdminUserID)
+		if err != nil {
+			return err
+		}
+		if len(roles) == 0 {
 			return ErrInvalidRefresh
 		}
 		nextRefresh, err := generateRefreshToken()
@@ -116,7 +126,7 @@ func (s *Service) RefreshToken(ctx context.Context, req RefreshTokenRequest, met
 		session.RefreshTokenHash = nextHash
 		session.LastUsedAt = &now
 		session.ReplacedAt = &now
-		token, err := s.tokens.GenerateAccessToken(session.AdminUser, session)
+		token, err := s.tokens.GenerateAccessToken(session.AdminUser, session, roles)
 		if err != nil {
 			return err
 		}
@@ -171,7 +181,7 @@ func (s *Service) ChangePassword(ctx context.Context, adminID uint64, req Change
 			}
 			return err
 		}
-		if user.Status != StatusActive {
+		if !loginAllowedStatus(user.Status) {
 			return ErrInactiveAdmin
 		}
 		if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(currentPassword)); err != nil {
@@ -184,12 +194,19 @@ func (s *Service) ChangePassword(ctx context.Context, adminID uint64, req Change
 		if err != nil {
 			return err
 		}
-		if err := tx.WithContext(ctx).Model(&AdminUser{}).Where("id = ?", adminID).Updates(map[string]any{
-			"password_hash":       string(hash),
-			"password_changed_at": now,
-			"token_version":       gorm.Expr("token_version + 1"),
-			"updated_at":          now,
-		}).Error; err != nil {
+		nextStatus := user.Status
+		if user.Status == StatusInvited {
+			nextStatus = StatusActive
+		}
+		updates := map[string]any{
+			"password_hash":        string(hash),
+			"password_changed_at":  now,
+			"must_change_password": false,
+			"status":               nextStatus,
+			"token_version":        gorm.Expr("token_version + 1"),
+			"updated_at":           now,
+		}
+		if err := tx.WithContext(ctx).Model(&AdminUser{}).Where("id = ?", adminID).Updates(updates).Error; err != nil {
 			return err
 		}
 		if err := tx.WithContext(ctx).Model(&AdminSession{}).
@@ -201,8 +218,13 @@ func (s *Service) ChangePassword(ctx context.Context, adminID uint64, req Change
 			}).Error; err != nil {
 			return err
 		}
-		return insertAdminAuditLogTx(ctx, tx, adminID, "ADMIN_PASSWORD_CHANGED", "ADMIN_USER", &user.UUID, map[string]any{}, map[string]any{
-			"sessionsRevoked": true,
+		return insertAdminAuditLogTx(ctx, tx, &adminID, AuditActorAdmin, "ADMIN_PASSWORD_CHANGED", "ADMIN_USER", &user.UUID, nil, map[string]any{
+			"status":             user.Status,
+			"mustChangePassword": user.MustChangePassword,
+		}, map[string]any{
+			"status":             nextStatus,
+			"mustChangePassword": false,
+			"sessionsRevoked":    true,
 		}, meta)
 	})
 }
@@ -215,17 +237,21 @@ func (s *Service) Me(ctx context.Context, adminID uint64) (*AdminUserResponse, e
 		}
 		return nil, err
 	}
-	permissions, err := s.Permissions(ctx, adminID)
+	roles, err := s.Roles(ctx, adminID)
 	if err != nil {
 		return nil, err
 	}
-	response := toAdminUserResponse(user, permissions)
+	permissions := PermissionsForRoles(roles)
+	response := toAdminUserResponse(user, roles, permissions)
 	return &response, nil
 }
 
 func (s *Service) Authenticate(ctx context.Context, rawToken string) (*AuthenticatedAdmin, error) {
 	claims, err := s.tokens.ParseAccessToken(rawToken)
 	if err != nil {
+		return nil, ErrUnauthorized
+	}
+	if claims.TokenType != "admin_access" {
 		return nil, ErrUnauthorized
 	}
 	adminUUID, err := uuid.Parse(claims.Subject)
@@ -237,16 +263,17 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 		return nil, ErrUnauthorized
 	}
 	var row struct {
-		AdminUserID       uint64
-		AdminUserUUID     uuid.UUID
-		AdminSessionID    uint64
-		AdminSessionUUID  uuid.UUID
-		Email             string
-		Status            string
-		TokenVersion      int
-		PasswordChangedAt *time.Time
-		ExpiresAt         time.Time
-		RevokedAt         *time.Time
+		AdminUserID        uint64
+		AdminUserUUID      uuid.UUID
+		AdminSessionID     uint64
+		AdminSessionUUID   uuid.UUID
+		Email              string
+		Status             string
+		MustChangePassword bool
+		TokenVersion       int
+		PasswordChangedAt  *time.Time
+		ExpiresAt          time.Time
+		RevokedAt          *time.Time
 	}
 	err = s.db.WithContext(ctx).Raw(`
 		SELECT
@@ -256,6 +283,7 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 		  s.uuid AS admin_session_uuid,
 		  au.email,
 		  au.status,
+		  au.must_change_password,
 		  au.token_version,
 		  au.password_changed_at,
 		  s.expires_at,
@@ -268,7 +296,7 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 	if err != nil {
 		return nil, ErrUnauthorized
 	}
-	if row.AdminUserID == 0 || row.Status != StatusActive || row.RevokedAt != nil || row.ExpiresAt.Before(time.Now().UTC()) {
+	if row.AdminUserID == 0 || !loginAllowedStatus(row.Status) || row.RevokedAt != nil || row.ExpiresAt.Before(time.Now().UTC()) {
 		return nil, ErrUnauthorized
 	}
 	if claims.TokenVersion != row.TokenVersion {
@@ -277,95 +305,57 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 	if !adminTokenStateValid(AdminUser{TokenVersion: row.TokenVersion, PasswordChangedAt: row.PasswordChangedAt}, claims.IssuedAt) {
 		return nil, ErrUnauthorized
 	}
+	roles, err := s.Roles(ctx, row.AdminUserID)
+	if err != nil || len(roles) == 0 {
+		return nil, ErrUnauthorized
+	}
 	return &AuthenticatedAdmin{
-		AdminUserID:      row.AdminUserID,
-		AdminUserUUID:    row.AdminUserUUID,
-		AdminSessionID:   row.AdminSessionID,
-		AdminSessionUUID: row.AdminSessionUUID,
-		Email:            row.Email,
+		AdminUserID:        row.AdminUserID,
+		AdminUserUUID:      row.AdminUserUUID,
+		AdminSessionID:     row.AdminSessionID,
+		AdminSessionUUID:   row.AdminSessionUUID,
+		Email:              row.Email,
+		Status:             row.Status,
+		MustChangePassword: row.MustChangePassword,
+		Roles:              roles,
 	}, nil
 }
 
 func (s *Service) HasPermission(ctx context.Context, adminID uint64, permission string) (bool, error) {
-	var exists bool
-	err := s.db.WithContext(ctx).Raw(`
-		SELECT EXISTS (
-		  SELECT 1
-		  FROM admin_user_permissions
-		  WHERE admin_user_id = ?
-		    AND permission_code = ?
-		)
-	`, adminID, permission).Scan(&exists).Error
-	return exists, err
+	roles, err := s.Roles(ctx, adminID)
+	if err != nil {
+		return false, err
+	}
+	for _, role := range roles {
+		if RoleHasPermission(role, permission) {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func (s *Service) Permissions(ctx context.Context, adminID uint64) ([]string, error) {
-	var permissions []string
-	err := s.db.WithContext(ctx).Raw(`
-		SELECT permission_code
-		FROM admin_user_permissions
-		WHERE admin_user_id = ?
-		ORDER BY permission_code ASC
-	`, adminID).Scan(&permissions).Error
-	return permissions, err
+	roles, err := s.Roles(ctx, adminID)
+	if err != nil {
+		return nil, err
+	}
+	return PermissionsForRoles(roles), nil
 }
 
-func (s *Service) CreateSuperAdmin(ctx context.Context, email string, password string) error {
-	email = normalizeEmail(email)
-	if email == "" {
-		return fmt.Errorf("email is required")
-	}
-	if len(password) < 12 {
-		return fmt.Errorf("password must be at least 12 characters")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return err
-	}
-	now := time.Now().UTC()
-	permissions := []string{
-		PermissionPaymentRequestsRead,
-		PermissionPaymentRequestsApprove,
-		PermissionPaymentRequestsReject,
-		PermissionAuditRead,
-	}
-	return s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		user := AdminUser{
-			UUID:         uuid.New(),
-			Email:        email,
-			PasswordHash: string(hash),
-			Status:       StatusActive,
-			TokenVersion: 1,
-			CreatedAt:    now,
-			UpdatedAt:    now,
-		}
-		if err := tx.Clauses(clause.OnConflict{
-			Columns: []clause.Column{{Name: "email"}},
-			DoUpdates: clause.Assignments(map[string]any{
-				"password_hash": string(hash),
-				"status":        StatusActive,
-				"token_version": gorm.Expr("GREATEST(admin_users.token_version, 1)"),
-				"updated_at":    now,
-			}),
-		}).Create(&user).Error; err != nil {
-			return err
-		}
-		if err := tx.Where("email = ?", email).First(&user).Error; err != nil {
-			return err
-		}
-		for _, permission := range permissions {
-			row := AdminUserPermission{
-				UUID:           uuid.New(),
-				AdminUserID:    user.ID,
-				PermissionCode: permission,
-				CreatedAt:      now,
-			}
-			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&row).Error; err != nil {
-				return err
-			}
-		}
-		return nil
-	})
+func (s *Service) Roles(ctx context.Context, adminID uint64) ([]string, error) {
+	return s.rolesWithDB(ctx, s.db, adminID)
+}
+
+func (s *Service) rolesWithDB(ctx context.Context, db *gorm.DB, adminID uint64) ([]string, error) {
+	var roles []string
+	err := db.WithContext(ctx).Raw(`
+		SELECT role
+		FROM admin_role_assignments
+		WHERE admin_user_id = ?
+		  AND status = ?
+		ORDER BY role ASC
+	`, adminID, RoleAssignmentActive).Scan(&roles).Error
+	return roles, err
 }
 
 func (s *Service) createSession(ctx context.Context, adminID uint64, meta RequestMeta, now time.Time) (*AdminSession, string, error) {
@@ -415,4 +405,8 @@ func adminRefreshSessionStateValid(user AdminUser, sessionCreatedAt time.Time) b
 		return true
 	}
 	return !sessionCreatedAt.Before(*user.PasswordChangedAt)
+}
+
+func loginAllowedStatus(status string) bool {
+	return status == StatusActive || status == StatusInvited
 }

@@ -959,6 +959,127 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
 
+  /api/v1/admin/roles:
+    get:
+      tags: [Admin]
+      summary: List admin roles and permissions
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/admin-users:
+    get:
+      tags: [Admin]
+      summary: List admin users
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Admin]
+      summary: Create invited admin user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAdminUserRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/admin-users/{adminUserUuid}:
+    get:
+      tags: [Admin]
+      summary: Admin user detail
+      parameters:
+        - $ref: "#/components/parameters/AdminUserUuid"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/admin-users/{adminUserUuid}/roles:
+    post:
+      tags: [Admin]
+      summary: Assign admin role
+      parameters:
+        - $ref: "#/components/parameters/AdminUserUuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AssignAdminRoleRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/admin-users/{adminUserUuid}/roles/{role}:
+    delete:
+      tags: [Admin]
+      summary: Remove admin role
+      parameters:
+        - $ref: "#/components/parameters/AdminUserUuid"
+        - name: role
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RemoveAdminRoleRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/admin-users/{adminUserUuid}/status:
+    patch:
+      tags: [Admin]
+      summary: Update admin user status
+      parameters:
+        - $ref: "#/components/parameters/AdminUserUuid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAdminStatusRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
   /api/v1/admin/audit-logs:
     get:
       tags: [Admin]
@@ -1085,6 +1206,13 @@ components:
         format: uuid
     AuditLogUuid:
       name: auditLogUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    AdminUserUuid:
+      name: adminUserUuid
       in: path
       required: true
       schema:
@@ -1308,15 +1436,66 @@ components:
           nullable: true
         status:
           type: string
-          enum: [ACTIVE, SUSPENDED]
+          enum: [INVITED, ACTIVE, DISABLED, LOCKED]
+        mustChangePassword:
+          type: boolean
         lastLoginAt:
           type: string
           format: date-time
           nullable: true
+        roles:
+          type: array
+          items:
+            type: string
         permissions:
           type: array
           items:
             type: string
+
+    CreateAdminUserRequest:
+      type: object
+      required: [email, roles, reason]
+      properties:
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        temporaryPassword:
+          type: string
+          minLength: 12
+        roles:
+          type: array
+          items:
+            type: string
+        reason:
+          type: string
+
+    AssignAdminRoleRequest:
+      type: object
+      required: [role, reason]
+      properties:
+        role:
+          type: string
+        reason:
+          type: string
+
+    RemoveAdminRoleRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+
+    UpdateAdminStatusRequest:
+      type: object
+      required: [status, reason]
+      properties:
+        status:
+          type: string
+          enum: [INVITED, ACTIVE, DISABLED, LOCKED]
+        reason:
+          type: string
 
     AdminReviewPaymentRequest:
       type: object
@@ -1347,6 +1526,9 @@ components:
           type: string
           format: email
           nullable: true
+        actorType:
+          type: string
+          enum: [ADMIN, SYSTEM]
         action:
           type: string
         resourceType:
@@ -1354,6 +1536,9 @@ components:
         resourceUuid:
           type: string
           format: uuid
+          nullable: true
+        reason:
+          type: string
           nullable: true
         beforeSnapshot:
           type: object

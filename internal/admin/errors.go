@@ -6,20 +6,41 @@ import (
 )
 
 var (
-	ErrUnauthorized      = errors.New("unauthorized")
-	ErrInvalidRefresh    = errors.New("invalid refresh token")
-	ErrInactiveAdmin     = errors.New("inactive admin")
-	ErrPermissionDenied  = errors.New("permission denied")
-	ErrAdminUserNotFound = errors.New("admin user not found")
-	ErrPasswordMismatch  = errors.New("password mismatch")
+	ErrUnauthorized           = errors.New("unauthorized")
+	ErrInvalidRefresh         = errors.New("invalid refresh token")
+	ErrInactiveAdmin          = errors.New("inactive admin")
+	ErrPermissionDenied       = errors.New("permission denied")
+	ErrAdminUserNotFound      = errors.New("admin user not found")
+	ErrPasswordMismatch       = errors.New("password mismatch")
+	ErrPasswordChangeRequired = errors.New("password change required")
 )
 
 const (
-	CodeValidation       = "VALIDATION_ERROR"
-	CodeUnauthorized     = "ADMIN_UNAUTHORIZED"
-	CodePermissionDenied = "ADMIN_PERMISSION_DENIED"
-	CodeNotFound         = "ADMIN_NOT_FOUND"
-	CodeConflict         = "ADMIN_CONFLICT"
+	CodeValidation                 = "VALIDATION_ERROR"
+	CodeUnauthorized               = "ADMIN_UNAUTHORIZED"
+	CodePermissionDenied           = "ADMIN_PERMISSION_DENIED"
+	CodeRoleRequired               = "ADMIN_ROLE_REQUIRED"
+	CodeRoleNotFound               = "ADMIN_ROLE_NOT_FOUND"
+	CodeRoleAlreadyAssigned        = "ADMIN_ROLE_ALREADY_ASSIGNED"
+	CodeRoleAssignmentNotAllowed   = "ADMIN_ROLE_ASSIGNMENT_NOT_ALLOWED"
+	CodeReasonRequired             = "ADMIN_REASON_REQUIRED"
+	CodeIdempotencyKeyRequired     = "ADMIN_IDEMPOTENCY_KEY_REQUIRED"
+	CodeAuditWriteFailed           = "ADMIN_AUDIT_WRITE_FAILED"
+	CodeTargetNotFound             = "ADMIN_TARGET_NOT_FOUND"
+	CodeActionNotAllowed           = "ADMIN_ACTION_NOT_ALLOWED"
+	CodeCannotModifySuperAdmin     = "ADMIN_CANNOT_MODIFY_SUPER_ADMIN"
+	CodeUserRestrictionNotFound    = "USER_RESTRICTION_NOT_FOUND"
+	CodeUserAlreadyRestricted      = "USER_ALREADY_RESTRICTED"
+	CodeUserNotRestricted          = "USER_NOT_RESTRICTED"
+	CodeLiveForceEndNotAllowed     = "LIVE_FORCE_END_NOT_ALLOWED"
+	CodeReportNotFound             = "REPORT_NOT_FOUND"
+	CodeReportAlreadyReviewed      = "REPORT_ALREADY_REVIEWED"
+	CodeReportActionNotAllowed     = "REPORT_ACTION_NOT_ALLOWED"
+	CodeWalletAdjustmentNotAllowed = "WALLET_ADJUSTMENT_NOT_ALLOWED"
+	CodeAnalyticsAccessDenied      = "ANALYTICS_ACCESS_DENIED"
+	CodePasswordChangeRequired     = "ADMIN_PASSWORD_CHANGE_REQUIRED"
+	CodeNotFound                   = "ADMIN_NOT_FOUND"
+	CodeConflict                   = "ADMIN_CONFLICT"
 )
 
 type ServiceError struct {
@@ -45,12 +66,32 @@ func permissionDeniedError() *ServiceError {
 	return &ServiceError{Status: http.StatusForbidden, Code: CodePermissionDenied, Message: "Permission denied"}
 }
 
+func forbiddenError(code string, message string, details any) *ServiceError {
+	return &ServiceError{Status: http.StatusForbidden, Code: code, Message: message, Details: details}
+}
+
 func notFoundError(message string) *ServiceError {
 	return &ServiceError{Status: http.StatusNotFound, Code: CodeNotFound, Message: message}
 }
 
+func targetNotFoundError(message string) *ServiceError {
+	return &ServiceError{Status: http.StatusNotFound, Code: CodeTargetNotFound, Message: message}
+}
+
 func conflictError(message string) *ServiceError {
 	return &ServiceError{Status: http.StatusConflict, Code: CodeConflict, Message: message}
+}
+
+func conflictCodeError(code string, message string) *ServiceError {
+	return &ServiceError{Status: http.StatusConflict, Code: code, Message: message}
+}
+
+func actionNotAllowedError(message string) *ServiceError {
+	return &ServiceError{Status: http.StatusConflict, Code: CodeActionNotAllowed, Message: message}
+}
+
+func passwordChangeRequiredError() *ServiceError {
+	return &ServiceError{Status: http.StatusForbidden, Code: CodePasswordChangeRequired, Message: "Password change required"}
 }
 
 func AsServiceError(err error) (*ServiceError, bool) {

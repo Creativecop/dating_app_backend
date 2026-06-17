@@ -91,6 +91,109 @@ func (h *Handler) Me(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Admin fetched successfully", result)
 }
 
+func (h *Handler) ListRoles(c *gin.Context) {
+	result, err := h.service.ListRoles(c.Request.Context())
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Admin roles fetched successfully", result)
+}
+
+func (h *Handler) ListAdminUsers(c *gin.Context) {
+	result, err := h.service.ListAdminUsers(c.Request.Context())
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Admin users fetched successfully", result)
+}
+
+func (h *Handler) AdminUserDetail(c *gin.Context) {
+	result, err := h.service.AdminUserDetail(c.Request.Context(), c.Param("adminUserUuid"))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Admin user fetched successfully", result)
+}
+
+func (h *Handler) CreateAdminUser(c *gin.Context) {
+	adminUser, ok := CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", CodeUnauthorized, nil)
+		return
+	}
+	var req CreateAdminUserRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Validation(c, err.Error())
+		return
+	}
+	result, err := h.service.CreateAdminUser(c.Request.Context(), adminUser.AdminUserID, req, requestMeta(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusCreated, "Admin user created successfully", result)
+}
+
+func (h *Handler) AssignAdminRole(c *gin.Context) {
+	adminUser, ok := CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", CodeUnauthorized, nil)
+		return
+	}
+	var req AssignRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Validation(c, err.Error())
+		return
+	}
+	result, err := h.service.AssignAdminRole(c.Request.Context(), adminUser.AdminUserID, c.Param("adminUserUuid"), req, requestMeta(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Admin role assigned successfully", result)
+}
+
+func (h *Handler) RemoveAdminRole(c *gin.Context) {
+	adminUser, ok := CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", CodeUnauthorized, nil)
+		return
+	}
+	var req RemoveRoleRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Validation(c, err.Error())
+		return
+	}
+	result, err := h.service.RemoveAdminRole(c.Request.Context(), adminUser.AdminUserID, c.Param("adminUserUuid"), c.Param("role"), req, requestMeta(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Admin role removed successfully", result)
+}
+
+func (h *Handler) UpdateAdminStatus(c *gin.Context) {
+	adminUser, ok := CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", CodeUnauthorized, nil)
+		return
+	}
+	var req UpdateAdminStatusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Validation(c, err.Error())
+		return
+	}
+	result, err := h.service.UpdateAdminStatus(c.Request.Context(), adminUser.AdminUserID, c.Param("adminUserUuid"), req, requestMeta(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Admin status updated successfully", result)
+}
+
 func (h *Handler) ListAuditLogs(c *gin.Context) {
 	result, err := h.service.ListAuditLogs(c.Request.Context(), AuditLogListQuery{
 		AdminUserUUID: c.Query("adminUserUuid"),
