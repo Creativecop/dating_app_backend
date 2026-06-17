@@ -31,6 +31,7 @@ const (
 
 	RestrictionActive  = "ACTIVE"
 	RestrictionRevoked = "REVOKED"
+	RestrictionExpired = "EXPIRED"
 
 	UserRestrictionFullPlatformBan      = "FULL_PLATFORM_BAN"
 	UserRestrictionLiveCreateBan        = "LIVE_CREATE_BAN"

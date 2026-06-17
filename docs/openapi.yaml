@@ -1080,6 +1080,114 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
 
+  /api/v1/admin/users:
+    get:
+      tags: [Admin]
+      summary: Search mobile users
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, SUSPENDED, BANNED, DELETED]
+        - name: createdFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: createdTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/users/{userId}:
+    get:
+      tags: [Admin]
+      summary: Mobile user detail
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/users/{userId}/restrictions:
+    get:
+      tags: [Admin]
+      summary: List user restrictions
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [ACTIVE, REVOKED, EXPIRED]
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+    post:
+      tags: [Admin]
+      summary: Create user restriction
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRestrictionRequest"
+      responses:
+        "201":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/users/{userId}/restrictions/{restrictionId}:
+    delete:
+      tags: [Admin]
+      summary: Revoke user restriction
+      parameters:
+        - $ref: "#/components/parameters/UserId"
+        - $ref: "#/components/parameters/RestrictionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RevokeUserRestrictionRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
   /api/v1/admin/audit-logs:
     get:
       tags: [Admin]
@@ -1213,6 +1321,20 @@ components:
         format: uuid
     AdminUserUuid:
       name: adminUserUuid
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RestrictionId:
+      name: restrictionId
       in: path
       required: true
       schema:
@@ -1496,6 +1618,51 @@ components:
           enum: [INVITED, ACTIVE, DISABLED, LOCKED]
         reason:
           type: string
+
+    CreateUserRestrictionRequest:
+      type: object
+      required: [restrictionType, reason]
+      properties:
+        restrictionType:
+          type: string
+          enum:
+            - FULL_PLATFORM_BAN
+            - LIVE_CREATE_BAN
+            - COMMENT_BAN
+            - GIFT_SEND_BAN
+            - RESELLER_OPERATION_BAN
+            - AGENCY_OPERATION_BAN
+        reason:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    RevokeUserRestrictionRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+
+    UserRestriction:
+      type: object
+      properties:
+        restrictionUuid:
+          type: string
+          format: uuid
+        restrictionType:
+          type: string
+        status:
+          type: string
+          enum: [ACTIVE, REVOKED, EXPIRED]
+        reason:
+          type: string
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
 
     AdminReviewPaymentRequest:
       type: object

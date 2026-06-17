@@ -122,6 +122,99 @@ type UpdateAdminStatusRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
 
+type AdminMobileUserListQuery struct {
+	Search      string
+	Status      string
+	CreatedFrom string
+	CreatedTo   string
+	Limit       string
+	Cursor      string
+}
+
+type AdminMobileUserListResponse struct {
+	Items      []AdminMobileUserListItem `json:"items"`
+	NextCursor *string                   `json:"nextCursor"`
+}
+
+type AdminMobileUserListItem struct {
+	UserUUID               string                   `json:"userUuid"`
+	Phone                  *string                  `json:"phone,omitempty"`
+	Email                  *string                  `json:"email,omitempty"`
+	Status                 string                   `json:"status"`
+	OnboardingStatus       string                   `json:"onboardingStatus"`
+	Profile                *AdminUserProfileSummary `json:"profile,omitempty"`
+	ActiveRestrictionCount int                      `json:"activeRestrictionCount"`
+	LastLoginAt            *time.Time               `json:"lastLoginAt,omitempty"`
+	CreatedAt              time.Time                `json:"createdAt"`
+	UpdatedAt              time.Time                `json:"updatedAt"`
+}
+
+type AdminMobileUserDetailResponse struct {
+	UserUUID         string                    `json:"userUuid"`
+	Phone            *string                   `json:"phone,omitempty"`
+	Email            *string                   `json:"email,omitempty"`
+	Status           string                    `json:"status"`
+	OnboardingStatus string                    `json:"onboardingStatus"`
+	Profile          *AdminUserProfileSummary  `json:"profile,omitempty"`
+	Restrictions     []UserRestrictionResponse `json:"activeRestrictions"`
+	RecentReports    []AdminRecentReport       `json:"recentReports"`
+	AuditHistory     []AuditLogResponse        `json:"auditHistory"`
+	WalletSummary    any                       `json:"walletSummary"`
+	LiveSummary      any                       `json:"liveSummary"`
+	LastLoginAt      *time.Time                `json:"lastLoginAt,omitempty"`
+	CreatedAt        time.Time                 `json:"createdAt"`
+	UpdatedAt        time.Time                 `json:"updatedAt"`
+}
+
+type AdminUserProfileSummary struct {
+	ProfileUUID   *string    `json:"profileUuid,omitempty"`
+	DisplayName   *string    `json:"displayName,omitempty"`
+	Gender        *string    `json:"gender,omitempty"`
+	City          *string    `json:"city,omitempty"`
+	Country       *string    `json:"country,omitempty"`
+	ProfileStatus *string    `json:"profileStatus,omitempty"`
+	CompletedAt   *time.Time `json:"completedAt,omitempty"`
+}
+
+type AdminRecentReport struct {
+	ReportUUID string    `json:"reportUuid"`
+	TargetType string    `json:"targetType"`
+	ReasonCode string    `json:"reasonCode"`
+	Status     string    `json:"status"`
+	Severity   string    `json:"severity"`
+	CreatedAt  time.Time `json:"createdAt"`
+}
+
+type UserRestrictionListResponse struct {
+	Items []UserRestrictionResponse `json:"items"`
+}
+
+type UserRestrictionResponse struct {
+	RestrictionUUID        string     `json:"restrictionUuid"`
+	RestrictionType        string     `json:"restrictionType"`
+	Status                 string     `json:"status"`
+	Reason                 string     `json:"reason"`
+	CreatedByAdminUserUUID *string    `json:"createdByAdminUserUuid,omitempty"`
+	CreatedByAdminEmail    *string    `json:"createdByAdminEmail,omitempty"`
+	RevokedByAdminUserUUID *string    `json:"revokedByAdminUserUuid,omitempty"`
+	RevokedByAdminEmail    *string    `json:"revokedByAdminEmail,omitempty"`
+	RevokedAt              *time.Time `json:"revokedAt,omitempty"`
+	RevocationReason       *string    `json:"revocationReason,omitempty"`
+	ExpiresAt              *time.Time `json:"expiresAt,omitempty"`
+	CreatedAt              time.Time  `json:"createdAt"`
+	UpdatedAt              time.Time  `json:"updatedAt"`
+}
+
+type CreateUserRestrictionRequest struct {
+	RestrictionType string     `json:"restrictionType" binding:"required"`
+	Reason          string     `json:"reason" binding:"required"`
+	ExpiresAt       *time.Time `json:"expiresAt"`
+}
+
+type RevokeUserRestrictionRequest struct {
+	Reason string `json:"reason" binding:"required"`
+}
+
 type AuditLogListQuery struct {
 	AdminUserUUID string
 	Action        string

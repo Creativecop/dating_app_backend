@@ -18,6 +18,11 @@ type auditLogCursor struct {
 	AuditLogID uint64    `json:"auditLogId"`
 }
 
+type adminUserListCursor struct {
+	CreatedAt time.Time `json:"createdAt"`
+	UserID    uint64    `json:"userId"`
+}
+
 func encodeAuditLogCursor(cursor auditLogCursor) (string, error) {
 	payload, err := json.Marshal(cursor)
 	if err != nil {
@@ -58,4 +63,31 @@ func normalizeAuditLogLimit(raw string) (int, error) {
 		return maxAuditLogLimit, nil
 	}
 	return value, nil
+}
+
+func encodeAdminUserListCursor(cursor adminUserListCursor) (string, error) {
+	payload, err := json.Marshal(cursor)
+	if err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(payload), nil
+}
+
+func decodeAdminUserListCursor(raw string) (*adminUserListCursor, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(raw)
+	if err != nil {
+		return nil, validationError("Cursor is invalid", map[string]any{"field": "cursor"})
+	}
+	var cursor adminUserListCursor
+	if err := json.Unmarshal(payload, &cursor); err != nil {
+		return nil, validationError("Cursor is invalid", map[string]any{"field": "cursor"})
+	}
+	if cursor.CreatedAt.IsZero() || cursor.UserID == 0 {
+		return nil, validationError("Cursor is invalid", map[string]any{"field": "cursor"})
+	}
+	return &cursor, nil
 }

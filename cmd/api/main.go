@@ -25,6 +25,7 @@ import (
 	"github.com/neoscoder/aura-backend/internal/profile"
 	"github.com/neoscoder/aura-backend/internal/queue"
 	appredis "github.com/neoscoder/aura-backend/internal/redis"
+	"github.com/neoscoder/aura-backend/internal/restriction"
 	"github.com/neoscoder/aura-backend/internal/router"
 	"github.com/neoscoder/aura-backend/internal/safety"
 	"github.com/neoscoder/aura-backend/internal/storage"
@@ -75,6 +76,7 @@ func main() {
 	discoveryService := discovery.NewService(db, cfg.Discovery)
 	discoveryService.SetDiscoveryEligibilityRefresher(profileService)
 	adminService := admin.NewService(db, cfg.AdminJWT)
+	restrictionService := restriction.NewService(db)
 	subscriptionService := subscription.NewService(db)
 	discoveryService.SetActionUsageLimiter(subscriptionService)
 	matchService := appmatch.NewService(db)
@@ -98,6 +100,7 @@ func main() {
 	mediaService.SetMediaVisibilityAuthorizer(discoveryService)
 	mediaService.AddMediaVisibilityAuthorizer(matchService)
 	authService := auth.NewService(db, cfg, otpService)
+	authService.SetRestrictionChecker(restrictionService)
 	authService.SetProfileEnsurer(profileService)
 	authService.SetDiscoveryPreferencesEnsurer(discoveryService)
 	authService.SetNotificationSettingsEnsurer(notificationService)
@@ -110,6 +113,8 @@ func main() {
 	discoveryHandler := discovery.NewHandler(discoveryService)
 	matchHandler := appmatch.NewHandler(matchService)
 	chatHandler := chat.NewHandler(chatService, chatHub, authService)
+	chatHandler.SetRestrictionChecker(restrictionService)
+	adminService.SetUserSocketDisconnecter(chatHub)
 	notificationHandler := notification.NewHandler(notificationService)
 	safetyHandler := safety.NewHandler(safetyService)
 	mediaHandler := media.NewHandler(mediaService, cfg.Media)

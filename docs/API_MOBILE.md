@@ -610,6 +610,67 @@ LOCKED   - cannot log in until status changes
 
 Role assignments are the authorization source of truth. `SUPER_ADMIN` grants all permissions, but lower roles cannot assign/remove `SUPER_ADMIN`, modify a `SUPER_ADMIN`, or remove/disable the last active `SUPER_ADMIN`.
 
+Admin user operations:
+
+```text
+GET /api/v1/admin/users?search=017&status=ACTIVE&createdFrom=2026-01-01T00:00:00Z&createdTo=2026-01-31T23:59:59Z&limit=50&cursor=...
+GET /api/v1/admin/users/{userId}
+```
+
+`userId` is the public user UUID. User detail includes available account/profile data, active restrictions, recent report summaries, and admin audit history for that user. Wallet and live summaries are `null` until those modules exist.
+
+User restriction endpoints:
+
+```text
+GET    /api/v1/admin/users/{userId}/restrictions?status=ACTIVE
+POST   /api/v1/admin/users/{userId}/restrictions
+DELETE /api/v1/admin/users/{userId}/restrictions/{restrictionId}
+```
+
+Restriction list supports:
+
+```text
+status=ACTIVE
+status=REVOKED
+status=EXPIRED
+```
+
+Create restriction:
+
+```json
+{
+  "restrictionType": "FULL_PLATFORM_BAN",
+  "reason": "Repeated policy violations",
+  "expiresAt": null
+}
+```
+
+Revoke restriction:
+
+```json
+{
+  "reason": "Appeal accepted"
+}
+```
+
+Restriction behavior:
+
+```text
+FULL_PLATFORM_BAN blocks login, refresh, authenticated routes, socket connect, and direct chat.
+COMMENT_BAN is reserved for future live comments and does not block direct chat.
+Expired ACTIVE restrictions are ignored by enforcement and are moved to EXPIRED before replacement creation.
+```
+
+Live operation route contracts for future live module:
+
+```text
+GET  /api/v1/admin/lives/active
+GET  /api/v1/admin/lives/{liveId}
+POST /api/v1/admin/lives/{liveId}/force-end
+```
+
+These are not implemented until a real live domain service exists; admin handlers must call that service when added.
+
 Manual payment review endpoints:
 
 ```text

@@ -14,6 +14,7 @@ import (
 
 	"github.com/neoscoder/aura-backend/internal/auth"
 	"github.com/neoscoder/aura-backend/internal/response"
+	"github.com/neoscoder/aura-backend/internal/restriction"
 )
 
 type Authenticator interface {
@@ -21,13 +22,22 @@ type Authenticator interface {
 }
 
 type Handler struct {
-	service       *Service
-	hub           *Hub
-	authenticator Authenticator
+	service            *Service
+	hub                *Hub
+	authenticator      Authenticator
+	restrictionChecker RestrictionChecker
+}
+
+type RestrictionChecker interface {
+	CanPerform(ctx context.Context, userID uint64, action string) error
 }
 
 func NewHandler(service *Service, hub *Hub, authenticator Authenticator) *Handler {
 	return &Handler{service: service, hub: hub, authenticator: authenticator}
+}
+
+func (h *Handler) SetRestrictionChecker(checker RestrictionChecker) {
+	h.restrictionChecker = checker
 }
 
 func (h *Handler) List(c *gin.Context) {
@@ -117,8 +127,14 @@ func (h *Handler) WebSocket(c *gin.Context) {
 	}
 	user, err := h.authenticator.Authenticate(c.Request.Context(), token)
 	if err != nil {
-		response.Unauthorized(c, auth.PublicErrorMessage(err))
+		response.Error(c, auth.PublicStatusCode(err), auth.PublicErrorMessage(err), auth.PublicErrorCode(err), nil)
 		return
+	}
+	if h.restrictionChecker != nil {
+		if err := h.restrictionChecker.CanPerform(c.Request.Context(), user.UserID, restriction.ActionSocketConnect); err != nil {
+			response.Error(c, auth.PublicStatusCode(err), auth.PublicErrorMessage(err), auth.PublicErrorCode(err), nil)
+			return
+		}
 	}
 
 	conn, err := websocket.Accept(c.Writer, c.Request, &websocket.AcceptOptions{InsecureSkipVerify: true})

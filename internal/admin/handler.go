@@ -194,6 +194,78 @@ func (h *Handler) UpdateAdminStatus(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Admin status updated successfully", result)
 }
 
+func (h *Handler) ListUsers(c *gin.Context) {
+	result, err := h.service.ListUsers(c.Request.Context(), AdminMobileUserListQuery{
+		Search:      c.Query("search"),
+		Status:      c.Query("status"),
+		CreatedFrom: c.Query("createdFrom"),
+		CreatedTo:   c.Query("createdTo"),
+		Limit:       c.Query("limit"),
+		Cursor:      c.Query("cursor"),
+	})
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Users fetched successfully", result)
+}
+
+func (h *Handler) UserDetail(c *gin.Context) {
+	result, err := h.service.UserDetail(c.Request.Context(), c.Param("userId"))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "User fetched successfully", result)
+}
+
+func (h *Handler) ListUserRestrictions(c *gin.Context) {
+	result, err := h.service.ListUserRestrictions(c.Request.Context(), c.Param("userId"), c.Query("status"))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "User restrictions fetched successfully", result)
+}
+
+func (h *Handler) CreateUserRestriction(c *gin.Context) {
+	adminUser, ok := CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", CodeUnauthorized, nil)
+		return
+	}
+	var req CreateUserRestrictionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Validation(c, err.Error())
+		return
+	}
+	result, err := h.service.CreateUserRestriction(c.Request.Context(), adminUser.AdminUserID, c.Param("userId"), req, requestMeta(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusCreated, "User restriction created successfully", result)
+}
+
+func (h *Handler) RevokeUserRestriction(c *gin.Context) {
+	adminUser, ok := CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", CodeUnauthorized, nil)
+		return
+	}
+	var req RevokeUserRestrictionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Validation(c, err.Error())
+		return
+	}
+	result, err := h.service.RevokeUserRestriction(c.Request.Context(), adminUser.AdminUserID, c.Param("userId"), c.Param("restrictionId"), req, requestMeta(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "User restriction revoked successfully", result)
+}
+
 func (h *Handler) ListAuditLogs(c *gin.Context) {
 	result, err := h.service.ListAuditLogs(c.Request.Context(), AuditLogListQuery{
 		AdminUserUUID: c.Query("adminUserUuid"),

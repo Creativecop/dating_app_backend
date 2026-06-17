@@ -81,6 +81,27 @@ func (h *Hub) SendToUser(userID uint64, event Event) int {
 	return delivered
 }
 
+func (h *Hub) DisconnectUser(userID uint64) int {
+	h.mu.Lock()
+	clients := h.clients[userID]
+	if len(clients) == 0 {
+		h.mu.Unlock()
+		return 0
+	}
+	delete(h.clients, userID)
+	copied := make([]*Client, 0, len(clients))
+	for client := range clients {
+		copied = append(copied, client)
+		close(client.send)
+	}
+	h.mu.Unlock()
+
+	for _, client := range copied {
+		_ = client.conn.Close(websocket.StatusPolicyViolation, "user restricted")
+	}
+	return len(copied)
+}
+
 func (h *Hub) AllowTypingEvent(userID uint64, conversationID uint64, event string) bool {
 	key := strconv.FormatUint(userID, 10) + ":" + strconv.FormatUint(conversationID, 10) + ":" + event
 	now := time.Now().UTC()

@@ -32,7 +32,7 @@ func Auth(service Authenticator) gin.HandlerFunc {
 
 		user, err := service.Authenticate(c.Request.Context(), token)
 		if err != nil {
-			response.Unauthorized(c, auth.PublicErrorMessage(err))
+			response.Error(c, auth.PublicStatusCode(err), auth.PublicErrorMessage(err), auth.PublicErrorCode(err), nil)
 			c.Abort()
 			return
 		}

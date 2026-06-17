@@ -13,6 +13,7 @@ import (
 
 	"github.com/neoscoder/aura-backend/internal/config"
 	"github.com/neoscoder/aura-backend/internal/otp"
+	"github.com/neoscoder/aura-backend/internal/restriction"
 )
 
 var (
@@ -33,6 +34,7 @@ type Service struct {
 	discoveryPreferencesEnsurer DiscoveryPreferencesEnsurer
 	notificationSettingsEnsurer NotificationSettingsEnsurer
 	safetySettingsEnsurer       SafetySettingsEnsurer
+	restrictionChecker          RestrictionChecker
 }
 
 type RequestMeta struct {
@@ -54,6 +56,10 @@ type NotificationSettingsEnsurer interface {
 
 type SafetySettingsEnsurer interface {
 	EnsureSafetySettings(ctx context.Context, userID uint64) error
+}
+
+type RestrictionChecker interface {
+	CanPerform(ctx context.Context, userID uint64, action string) error
 }
 
 func NewService(db *gorm.DB, cfg *config.Config, otpService *otp.Service) *Service {
@@ -79,6 +85,10 @@ func (s *Service) SetNotificationSettingsEnsurer(ensurer NotificationSettingsEns
 
 func (s *Service) SetSafetySettingsEnsurer(ensurer SafetySettingsEnsurer) {
 	s.safetySettingsEnsurer = ensurer
+}
+
+func (s *Service) SetRestrictionChecker(checker RestrictionChecker) {
+	s.restrictionChecker = checker
 }
 
 func (s *Service) RequestOTP(ctx context.Context, req RequestOTPRequest, meta RequestMeta) error {
@@ -146,6 +156,9 @@ func (s *Service) VerifyOTP(ctx context.Context, req VerifyOTPRequest, meta Requ
 
 		if user.Status != UserStatusActive || user.DeletedAt != nil {
 			return ErrInactiveUser
+		}
+		if err := s.canPerform(ctx, user.ID, restriction.ActionLogin); err != nil {
+			return err
 		}
 
 		updates := map[string]any{"last_login_at": now, "updated_at": now}
@@ -228,6 +241,9 @@ func (s *Service) RefreshToken(ctx context.Context, req RefreshTokenRequest, met
 			return err
 		}
 		if err := validateUser(session.User); err != nil {
+			return err
+		}
+		if err := s.canPerform(ctx, session.UserID, restriction.ActionRefreshToken); err != nil {
 			return err
 		}
 		if req.DeviceID != "" && session.DeviceID != nil && *session.DeviceID != req.DeviceID {
@@ -406,6 +422,9 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 	if err := validateUser(session.User); err != nil {
 		return nil, err
 	}
+	if err := s.canPerform(ctx, session.UserID, restriction.ActionAuthenticated); err != nil {
+		return nil, err
+	}
 	if session.User.UUID.String() != claims.Subject {
 		return nil, ErrUnauthorized
 	}
@@ -420,6 +439,13 @@ func (s *Service) Authenticate(ctx context.Context, rawToken string) (*Authentic
 		SessionID:   session.ID,
 		SessionUUID: session.UUID,
 	}, nil
+}
+
+func (s *Service) canPerform(ctx context.Context, userID uint64, action string) error {
+	if s.restrictionChecker == nil {
+		return nil
+	}
+	return s.restrictionChecker.CanPerform(ctx, userID, action)
 }
 
 func (s *Service) createSession(ctx context.Context, user User, req VerifyOTPRequest, meta RequestMeta, now time.Time) (*UserSession, string, error) {
@@ -551,6 +577,7 @@ func IsClientError(err error) bool {
 		errors.Is(err, ErrDeviceMismatch) ||
 		errors.Is(err, ErrInactiveUser) ||
 		errors.Is(err, ErrAccountDeleted) ||
+		errors.Is(err, restriction.ErrActionRestricted) ||
 		errors.Is(err, otp.ErrInvalidChannel) ||
 		errors.Is(err, otp.ErrInvalidPurpose) ||
 		errors.Is(err, otp.ErrInvalidIdentifier) ||
@@ -574,6 +601,8 @@ func PublicErrorMessage(err error) string {
 		return "Device mismatch."
 	case errors.Is(err, ErrInactiveUser), errors.Is(err, ErrAccountDeleted):
 		return "Account is not active."
+	case errors.Is(err, restriction.ErrActionRestricted):
+		return "User action is restricted."
 	case errors.Is(err, ErrUnauthorized):
 		return "Unauthorized."
 	default:
@@ -595,6 +624,8 @@ func PublicErrorCode(err error) string {
 		return "DEVICE_MISMATCH"
 	case errors.Is(err, ErrInactiveUser), errors.Is(err, ErrAccountDeleted):
 		return "ACCOUNT_INACTIVE"
+	case errors.Is(err, restriction.ErrActionRestricted):
+		return "USER_ACTION_RESTRICTED"
 	case errors.Is(err, ErrUnauthorized):
 		return "UNAUTHORIZED"
 	default:
@@ -608,6 +639,8 @@ func PublicStatusCode(err error) int {
 		return 429
 	case errors.Is(err, ErrUnauthorized), errors.Is(err, ErrInvalidRefresh), errors.Is(err, ErrInactiveUser), errors.Is(err, ErrAccountDeleted):
 		return 401
+	case errors.Is(err, restriction.ErrActionRestricted):
+		return 403
 	default:
 		if IsClientError(err) {
 			return 400

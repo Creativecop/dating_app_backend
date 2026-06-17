@@ -16,13 +16,22 @@ import (
 )
 
 type Service struct {
-	db     *gorm.DB
-	cfg    config.JWTConfig
-	tokens *TokenService
+	db                 *gorm.DB
+	cfg                config.JWTConfig
+	tokens             *TokenService
+	socketDisconnecter UserSocketDisconnecter
 }
 
 func NewService(db *gorm.DB, cfg config.JWTConfig) *Service {
 	return &Service{db: db, cfg: cfg, tokens: NewTokenService(cfg)}
+}
+
+type UserSocketDisconnecter interface {
+	DisconnectUser(userID uint64) int
+}
+
+func (s *Service) SetUserSocketDisconnecter(disconnecter UserSocketDisconnecter) {
+	s.socketDisconnecter = disconnecter
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest, meta RequestMeta) (*AuthResponse, error) {

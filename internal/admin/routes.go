@@ -35,4 +35,12 @@ func RegisterRoutes(v1 *gin.RouterGroup, service *Service, handler *Handler) {
 	adminUserRoutes.POST("/:adminUserUuid/roles", RequirePermission(service, PermissionRolesManage), handler.AssignAdminRole)
 	adminUserRoutes.DELETE("/:adminUserUuid/roles/:role", RequirePermission(service, PermissionRolesManage), handler.RemoveAdminRole)
 	adminUserRoutes.PATCH("/:adminUserUuid/status", RequirePermission(service, PermissionAdminUsersManage), handler.UpdateAdminStatus)
+
+	userRoutes := adminGroup.Group("/users")
+	userRoutes.Use(Auth(service), RequirePasswordReady())
+	userRoutes.GET("", RequirePermission(service, PermissionUsersRead), handler.ListUsers)
+	userRoutes.GET("/:userId", RequirePermission(service, PermissionUsersRead), handler.UserDetail)
+	userRoutes.GET("/:userId/restrictions", RequirePermission(service, PermissionUsersRead), handler.ListUserRestrictions)
+	userRoutes.POST("/:userId/restrictions", RequirePermission(service, PermissionUsersRestrict), handler.CreateUserRestriction)
+	userRoutes.DELETE("/:userId/restrictions/:restrictionId", RequirePermission(service, PermissionUsersRestrict), handler.RevokeUserRestriction)
 }
