@@ -610,6 +610,31 @@ LOCKED   - cannot log in until status changes
 
 Role assignments are the authorization source of truth. `SUPER_ADMIN` grants all permissions, but lower roles cannot assign/remove `SUPER_ADMIN`, modify a `SUPER_ADMIN`, or remove/disable the last active `SUPER_ADMIN`.
 
+Admin capabilities:
+
+```text
+GET /api/v1/admin/capabilities
+```
+
+Capabilities are backend-derived from registered services and enabled modules; permissions do not imply that a module exists. In this repo, Trust & Safety report review is enabled, while wallet, gift, agency, reseller, live, live-comment, and chat moderation modules are disabled until their domain packages exist.
+
+Example response data:
+
+```json
+{
+  "modules": {
+    "trustSafety": true,
+    "wallet": false,
+    "gift": false,
+    "agency": false,
+    "reseller": false,
+    "live": false,
+    "liveComments": false,
+    "chatModeration": false
+  }
+}
+```
+
 Admin user operations:
 
 ```text
@@ -661,6 +686,53 @@ COMMENT_BAN is reserved for future live comments and does not block direct chat.
 Expired ACTIVE restrictions are ignored by enforcement and are moved to EXPIRED before replacement creation.
 ```
 
+Admin report review endpoints:
+
+```text
+GET  /api/v1/admin/reports?status=PENDING&targetType=USER&severity=HIGH&limit=50&cursor=...
+GET  /api/v1/admin/reports/{reportId}
+POST /api/v1/admin/reports/{reportId}/review
+```
+
+`reportId` is the public report UUID. Report review requires `reports.review`, a pending report, and a reason.
+
+Review without enforcement:
+
+```json
+{
+  "decision": "REVIEWED",
+  "reason": "Checked by trust and safety",
+  "action": {
+    "type": "NONE"
+  }
+}
+```
+
+Dismiss report:
+
+```json
+{
+  "decision": "DISMISSED",
+  "reason": "No violation found"
+}
+```
+
+Restrict reported user:
+
+```json
+{
+  "decision": "ACTIONED",
+  "reason": "Abusive behavior confirmed",
+  "action": {
+    "type": "RESTRICT_USER",
+    "restrictionType": "COMMENT_BAN",
+    "expiresAt": "2026-07-17T00:00:00Z"
+  }
+}
+```
+
+`ACTIONED` requires a real executed backend action. In this repo, only `RESTRICT_USER` is available. `HIDE_COMMENT`, `FORCE_END_LIVE`, and `HIDE_CHAT_MESSAGE` return `REPORT_ACTION_NOT_ALLOWED`.
+
 Live operation route contracts for future live module:
 
 ```text
@@ -670,6 +742,17 @@ POST /api/v1/admin/lives/{liveId}/force-end
 ```
 
 These are not implemented until a real live domain service exists; admin handlers must call that service when added.
+
+Future admin operation contracts for unavailable modules:
+
+```text
+Wallet:   audit, adjustment, transaction reversal
+Gift:     catalog create/update/deactivate
+Agency:   approve/reject/suspend/commission/settlement reports
+Reseller: approve/reject/freeze/limits/commission/allocation/top-up reversal
+```
+
+These routes are not registered in this repo until real domain services and schemas exist.
 
 Manual payment review endpoints:
 

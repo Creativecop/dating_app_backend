@@ -18,6 +18,10 @@ func RegisterRoutes(v1 *gin.RouterGroup, service *Service, handler *Handler) {
 	protected.POST("/logout", handler.Logout)
 	protected.GET("/me", handler.Me)
 
+	capabilityRoutes := adminGroup.Group("/capabilities")
+	capabilityRoutes.Use(Auth(service), RequirePasswordReady())
+	capabilityRoutes.GET("", handler.Capabilities)
+
 	auditRoutes := adminGroup.Group("/audit-logs")
 	auditRoutes.Use(Auth(service), RequirePasswordReady(), RequirePermission(service, PermissionAuditRead))
 	auditRoutes.GET("", handler.ListAuditLogs)

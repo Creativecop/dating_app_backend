@@ -45,6 +45,7 @@ const (
 	PermissionLivesMonitor     = "lives.monitor"
 	PermissionLivesForceEnd    = "lives.force_end"
 	PermissionReportsReview    = "reports.review"
+	PermissionCommentsModerate = "comments.moderate"
 	PermissionGiftsManage      = "gifts.manage"
 	PermissionWalletAudit      = "wallet.audit"
 	PermissionWalletAdjust     = "wallet.adjust"

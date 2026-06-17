@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	adminpkg "github.com/neoscoder/aura-backend/internal/admin"
 	"github.com/neoscoder/aura-backend/internal/auth"
 	"github.com/neoscoder/aura-backend/internal/response"
 )
@@ -146,6 +147,50 @@ func (h *Handler) UpdateSettings(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Safety settings updated successfully", result)
 }
 
+func (h *Handler) AdminListReports(c *gin.Context) {
+	result, err := h.service.AdminListReports(c.Request.Context(), AdminReportListQuery{
+		Status:      c.Query("status"),
+		TargetType:  c.Query("targetType"),
+		Severity:    c.Query("severity"),
+		CreatedFrom: c.Query("createdFrom"),
+		CreatedTo:   c.Query("createdTo"),
+		Limit:       c.Query("limit"),
+		Cursor:      c.Query("cursor"),
+	})
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Reports fetched successfully", result)
+}
+
+func (h *Handler) AdminReportDetail(c *gin.Context) {
+	result, err := h.service.AdminReportDetail(c.Request.Context(), c.Param("reportId"))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Report fetched successfully", result)
+}
+
+func (h *Handler) AdminReviewReport(c *gin.Context) {
+	adminUser, ok := currentAdmin(c)
+	if !ok {
+		return
+	}
+	var req ReviewReportRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Validation(c, err.Error())
+		return
+	}
+	result, err := h.service.AdminReviewReport(c.Request.Context(), adminUser.AdminUserID, c.Param("reportId"), req, adminMeta(c))
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Report reviewed successfully", result)
+}
+
 func (h *Handler) writeError(c *gin.Context, err error) {
 	if serviceErr, ok := AsServiceError(err); ok {
 		response.Error(c, serviceErr.Status, serviceErr.Message, serviceErr.Code, serviceErr.Details)
@@ -161,4 +206,17 @@ func currentUser(c *gin.Context) (auth.AuthenticatedUser, bool) {
 		return auth.AuthenticatedUser{}, false
 	}
 	return user, true
+}
+
+func currentAdmin(c *gin.Context) (adminpkg.AuthenticatedAdmin, bool) {
+	adminUser, ok := adminpkg.CurrentAdmin(c)
+	if !ok {
+		response.Error(c, http.StatusUnauthorized, "Unauthorized", adminpkg.CodeUnauthorized, nil)
+		return adminpkg.AuthenticatedAdmin{}, false
+	}
+	return adminUser, true
+}
+
+func adminMeta(c *gin.Context) adminpkg.RequestMeta {
+	return adminpkg.RequestMeta{IPAddress: c.ClientIP(), UserAgent: c.Request.UserAgent()}
 }

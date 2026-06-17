@@ -80,6 +80,7 @@ func New(deps Dependencies) *gin.Engine {
 	notification.RegisterRoutes(v1, middleware.Auth(deps.AuthService), deps.NotificationHandler)
 	safety.RegisterRoutes(v1, middleware.Auth(deps.AuthService), deps.SafetyHandler)
 	admin.RegisterRoutes(v1, deps.AdminService, deps.AdminHandler)
+	safety.RegisterAdminRoutes(v1, deps.AdminService, deps.SafetyHandler)
 	subscription.RegisterRoutes(v1, middleware.Auth(deps.AuthService), deps.SubscriptionHandler)
 	subscription.RegisterAdminRoutes(v1, deps.AdminService, deps.SubscriptionHandler)
 

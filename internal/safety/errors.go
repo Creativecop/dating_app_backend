@@ -3,9 +3,12 @@ package safety
 import "net/http"
 
 const (
-	CodeValidation = "VALIDATION_ERROR"
-	CodeNotFound   = "SAFETY_NOT_FOUND"
-	CodeForbidden  = "SAFETY_FORBIDDEN"
+	CodeValidation             = "VALIDATION_ERROR"
+	CodeNotFound               = "SAFETY_NOT_FOUND"
+	CodeForbidden              = "SAFETY_FORBIDDEN"
+	CodeReportNotFound         = "REPORT_NOT_FOUND"
+	CodeReportAlreadyReviewed  = "REPORT_ALREADY_REVIEWED"
+	CodeReportActionNotAllowed = "REPORT_ACTION_NOT_ALLOWED"
 )
 
 type ServiceError struct {

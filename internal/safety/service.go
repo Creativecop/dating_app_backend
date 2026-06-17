@@ -14,7 +14,8 @@ import (
 )
 
 type Service struct {
-	db *gorm.DB
+	db       *gorm.DB
+	adminOps AdminOperations
 }
 
 type reasonRow struct {
@@ -56,6 +57,10 @@ type targetSnapshot struct {
 
 func NewService(db *gorm.DB) *Service {
 	return &Service{db: db}
+}
+
+func (s *Service) SetAdminOperations(ops AdminOperations) {
+	s.adminOps = ops
 }
 
 func (s *Service) EnsureSafetySettings(ctx context.Context, userID uint64) error {
@@ -178,7 +183,7 @@ func (s *Service) CreateReport(ctx context.Context, reporterID uint64, req Creat
 				}
 			}
 		}
-		result = CreateReportResponse{ReportUUID: reportUUID, CaseUUID: caseUUID, Status: ReportOpen, Blocked: blocked}
+		result = CreateReportResponse{ReportUUID: reportUUID, CaseUUID: caseUUID, Status: ReportPending, Blocked: blocked}
 		return nil
 	})
 	if err != nil {
@@ -683,7 +688,7 @@ func (s *Service) openReportTx(ctx context.Context, tx *gorm.DB, reporterID uint
 		  AND r.target_type = ?
 		  AND r.target_uuid = ?
 		  AND r.reason_id = ?
-		  AND r.status IN ('OPEN', 'IN_REVIEW')
+		  AND r.status = 'PENDING'
 		LIMIT 1
 	`, reporterID, targetType, targetUUID, reasonID).Scan(&row).Error
 	if err != nil {
@@ -762,7 +767,7 @@ func (s *Service) insertReportTx(ctx context.Context, tx *gorm.DB, reporterID ui
 		  created_at,
 		  updated_at
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, 'OPEN', ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?::jsonb, 'PENDING', ?, ?, ?, ?)
 		RETURNING id, uuid::text AS uuid
 	`, uuid.New(), reporterID, target.ReportedUserID, target.TargetType, target.TargetUUID, reasonID, note, string(evidence), severity, caseID, now, now).Scan(&inserted).Error; err != nil {
 		return 0, "", err

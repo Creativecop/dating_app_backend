@@ -24,8 +24,16 @@ const (
 	ReasonImpersonation  = "IMPERSONATION"
 	ReasonOther          = "OTHER"
 
-	ReportOpen     = "OPEN"
-	ReportInReview = "IN_REVIEW"
+	ReportPending   = "PENDING"
+	ReportReviewed  = "REVIEWED"
+	ReportDismissed = "DISMISSED"
+	ReportActioned  = "ACTIONED"
+
+	ReportActionNone            = "NONE"
+	ReportActionRestrictUser    = "RESTRICT_USER"
+	ReportActionHideComment     = "HIDE_COMMENT"
+	ReportActionForceEndLive    = "FORCE_END_LIVE"
+	ReportActionHideChatMessage = "HIDE_CHAT_MESSAGE"
 
 	SeverityLow      = "LOW"
 	SeverityMedium   = "MEDIUM"
@@ -61,20 +69,26 @@ func (ReportReason) TableName() string {
 }
 
 type Report struct {
-	ID               uint64    `gorm:"primaryKey"`
-	UUID             uuid.UUID `gorm:"type:uuid;uniqueIndex"`
-	ReporterUserID   uint64
-	ReportedUserID   *uint64
-	TargetType       string
-	TargetUUID       uuid.UUID
-	ReasonID         uint64
-	Note             *string
-	EvidenceSnapshot datatypes.JSON
-	Status           string
-	Severity         string
-	ModerationCaseID *uint64
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                uint64    `gorm:"primaryKey"`
+	UUID              uuid.UUID `gorm:"type:uuid;uniqueIndex"`
+	ReporterUserID    uint64
+	ReportedUserID    *uint64
+	TargetType        string
+	TargetUUID        uuid.UUID
+	ReasonID          uint64
+	Note              *string
+	EvidenceSnapshot  datatypes.JSON
+	Status            string
+	Severity          string
+	ModerationCaseID  *uint64
+	ReviewedAt        *time.Time
+	ReviewedByAdminID *uint64
+	ReviewReason      *string
+	ReviewNote        *string
+	ReviewActionType  *string
+	ReviewMetadata    datatypes.JSON
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 func (Report) TableName() string {

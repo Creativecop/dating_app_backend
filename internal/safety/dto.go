@@ -75,3 +75,68 @@ type SafetySettingsResponse struct {
 	AllowMessageRequests bool   `json:"allowMessageRequests"`
 	AutoHideBlockedUsers bool   `json:"autoHideBlockedUsers"`
 }
+
+type AdminReportListQuery struct {
+	Status      string
+	TargetType  string
+	Severity    string
+	CreatedFrom string
+	CreatedTo   string
+	Limit       string
+	Cursor      string
+}
+
+type AdminReportListResponse struct {
+	Items      []AdminReportListItem `json:"items"`
+	NextCursor *string               `json:"nextCursor"`
+}
+
+type AdminReportListItem struct {
+	ReportUUID       string     `json:"reportUuid"`
+	CaseUUID         *string    `json:"caseUuid,omitempty"`
+	ReporterUUID     string     `json:"reporterUuid"`
+	ReportedUserUUID *string    `json:"reportedUserUuid,omitempty"`
+	TargetType       string     `json:"targetType"`
+	TargetUUID       string     `json:"targetUuid"`
+	ReasonCode       string     `json:"reasonCode"`
+	Status           string     `json:"status"`
+	Severity         string     `json:"severity"`
+	ReviewedAt       *time.Time `json:"reviewedAt,omitempty"`
+	CreatedAt        time.Time  `json:"createdAt"`
+}
+
+type AdminReportDetailResponse struct {
+	ReportUUID          string         `json:"reportUuid"`
+	CaseUUID            *string        `json:"caseUuid,omitempty"`
+	ReporterUUID        string         `json:"reporterUuid"`
+	ReportedUserUUID    *string        `json:"reportedUserUuid,omitempty"`
+	TargetType          string         `json:"targetType"`
+	TargetUUID          string         `json:"targetUuid"`
+	ReasonCode          string         `json:"reasonCode"`
+	ReasonTitle         string         `json:"reasonTitle"`
+	Note                *string        `json:"note,omitempty"`
+	EvidenceSnapshot    map[string]any `json:"evidenceSnapshot"`
+	Status              string         `json:"status"`
+	Severity            string         `json:"severity"`
+	ReviewedAt          *time.Time     `json:"reviewedAt,omitempty"`
+	ReviewedByAdminUUID *string        `json:"reviewedByAdminUuid,omitempty"`
+	ReviewReason        *string        `json:"reviewReason,omitempty"`
+	ReviewNote          *string        `json:"reviewNote,omitempty"`
+	ReviewActionType    *string        `json:"reviewActionType,omitempty"`
+	ReviewMetadata      map[string]any `json:"reviewMetadata"`
+	CreatedAt           time.Time      `json:"createdAt"`
+	UpdatedAt           time.Time      `json:"updatedAt"`
+}
+
+type ReviewReportRequest struct {
+	Decision string              `json:"decision" binding:"required"`
+	Reason   string              `json:"reason" binding:"required"`
+	Note     *string             `json:"note"`
+	Action   *ReviewReportAction `json:"action"`
+}
+
+type ReviewReportAction struct {
+	Type            string     `json:"type"`
+	RestrictionType string     `json:"restrictionType"`
+	ExpiresAt       *time.Time `json:"expiresAt"`
+}

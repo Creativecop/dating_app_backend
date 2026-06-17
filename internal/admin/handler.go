@@ -91,6 +91,15 @@ func (h *Handler) Me(c *gin.Context) {
 	response.Success(c, http.StatusOK, "Admin fetched successfully", result)
 }
 
+func (h *Handler) Capabilities(c *gin.Context) {
+	result, err := h.service.Capabilities(c.Request.Context())
+	if err != nil {
+		h.writeError(c, err)
+		return
+	}
+	response.Success(c, http.StatusOK, "Admin capabilities fetched successfully", result)
+}
+
 func (h *Handler) ListRoles(c *gin.Context) {
 	result, err := h.service.ListRoles(c.Request.Context())
 	if err != nil {

@@ -207,6 +207,11 @@ func insertAdminAuditLogTx(ctx context.Context, tx *gorm.DB, adminID *uint64, ac
 	`, adminID, actorType, action, resourceType, resourceUUID, reason, string(beforeJSON), string(afterJSON), meta.IPAddress, meta.UserAgent).Error
 }
 
+func (s *Service) InsertAuditLogTx(ctx context.Context, tx *gorm.DB, adminID *uint64, actorType string, action string, resourceType string, resourceUUID *uuid.UUID, reason *string, before any, after any, meta RequestMeta) error {
+	_ = s
+	return insertAdminAuditLogTx(ctx, tx, adminID, actorType, action, resourceType, resourceUUID, reason, before, after, meta)
+}
+
 func minInt(a, b int) int {
 	if a < b {
 		return a

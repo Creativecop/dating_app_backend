@@ -122,6 +122,21 @@ type UpdateAdminStatusRequest struct {
 	Reason string `json:"reason" binding:"required"`
 }
 
+type AdminCapabilitiesResponse struct {
+	Modules AdminModuleCapabilities `json:"modules"`
+}
+
+type AdminModuleCapabilities struct {
+	TrustSafety    bool `json:"trustSafety"`
+	Wallet         bool `json:"wallet"`
+	Gift           bool `json:"gift"`
+	Agency         bool `json:"agency"`
+	Reseller       bool `json:"reseller"`
+	Live           bool `json:"live"`
+	LiveComments   bool `json:"liveComments"`
+	ChatModeration bool `json:"chatModeration"`
+}
+
 type AdminMobileUserListQuery struct {
 	Search      string
 	Status      string

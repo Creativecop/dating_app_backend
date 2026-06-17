@@ -21,8 +21,8 @@ func TestRolePermissionMatrix(t *testing.T) {
 		disallowed string
 	}{
 		{RoleFinanceAdmin, PermissionWalletAdjust, PermissionRolesManage},
-		{RoleTrustSafety, PermissionReportsReview, PermissionWalletAdjust},
-		{RoleSupportAgent, PermissionUsersRead, PermissionUsersRestrict},
+		{RoleTrustSafety, PermissionCommentsModerate, PermissionWalletAdjust},
+		{RoleSupportAgent, PermissionReportsReview, PermissionCommentsModerate},
 		{RoleGiftManager, PermissionGiftsManage, PermissionAgencyManage},
 		{RoleAgencyManager, PermissionAgencyManage, PermissionGiftsManage},
 		{RoleResellerManager, PermissionResellerAllocate, PermissionWalletAdjust},

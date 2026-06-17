@@ -20,6 +20,7 @@ type Service struct {
 	cfg                config.JWTConfig
 	tokens             *TokenService
 	socketDisconnecter UserSocketDisconnecter
+	capabilities       AdminModuleCapabilities
 }
 
 func NewService(db *gorm.DB, cfg config.JWTConfig) *Service {
@@ -32,6 +33,15 @@ type UserSocketDisconnecter interface {
 
 func (s *Service) SetUserSocketDisconnecter(disconnecter UserSocketDisconnecter) {
 	s.socketDisconnecter = disconnecter
+}
+
+func (s *Service) SetModuleCapabilities(capabilities AdminModuleCapabilities) {
+	s.capabilities = capabilities
+}
+
+func (s *Service) Capabilities(ctx context.Context) (*AdminCapabilitiesResponse, error) {
+	_ = ctx
+	return &AdminCapabilitiesResponse{Modules: s.capabilities}, nil
 }
 
 func (s *Service) Login(ctx context.Context, req LoginRequest, meta RequestMeta) (*AuthResponse, error) {

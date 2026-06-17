@@ -210,68 +210,14 @@ func (s *Service) CreateUserRestriction(ctx context.Context, actorID uint64, raw
 		if err != nil {
 			return err
 		}
-		disconnectUserID = user.ID
-		if err := s.expireActiveRestrictionsTx(ctx, tx, user.ID, user.UUID, restrictionType, now); err != nil {
-			return err
-		}
-		var exists bool
-		if err := tx.WithContext(ctx).Raw(`
-			SELECT EXISTS (
-			  SELECT 1
-			  FROM user_restrictions
-			  WHERE user_id = ?
-			    AND restriction_type = ?
-			    AND status = ?
-			    AND (expires_at IS NULL OR expires_at > ?)
-			)
-		`, user.ID, restrictionType, restriction.StatusActive, now).Scan(&exists).Error; err != nil {
-			return err
-		}
-		if exists {
-			return conflictCodeError(CodeUserAlreadyRestricted, "User already has an active restriction")
-		}
-
-		row := UserRestriction{
-			UUID:                 uuid.New(),
-			UserID:               user.ID,
-			RestrictionType:      restrictionType,
-			Status:               restriction.StatusActive,
-			Reason:               reason,
-			CreatedByAdminUserID: actorID,
-			ExpiresAt:            req.ExpiresAt,
-			CreatedAt:            now,
-			UpdatedAt:            now,
-		}
-		if err := tx.WithContext(ctx).Create(&row).Error; err != nil {
-			return err
-		}
-		sessionsRevoked := int64(0)
-		if restrictionType == restriction.TypeFullPlatformBan {
-			result := tx.WithContext(ctx).Exec(`
-				UPDATE user_sessions
-				SET revoked_at = ?, updated_at = ?
-				WHERE user_id = ?
-				  AND revoked_at IS NULL
-			`, now, now, user.ID)
-			if result.Error != nil {
-				return result.Error
-			}
-			sessionsRevoked = result.RowsAffected
-			disconnectAfterCommit = true
-		}
-		rows, err := s.userRestrictionRowsByID(ctx, tx, row.ID)
+		createdRow, fullBanCreated, err := s.createUserRestrictionTx(ctx, tx, actorID, user, restrictionType, reason, req.ExpiresAt, meta, now)
 		if err != nil {
 			return err
 		}
-		created = rows
-		return insertAdminAuditLogTx(ctx, tx, &actorID, AuditActorAdmin, "USER_RESTRICTION_CREATED", auditResourceUser, &user.UUID, &reason, map[string]any{}, map[string]any{
-			"restrictionUuid":  created.RestrictionUUID,
-			"restrictionType":  created.RestrictionType,
-			"status":           created.Status,
-			"expiresAt":        created.ExpiresAt,
-			"sessionsRevoked":  sessionsRevoked,
-			"socketDisconnect": restrictionType == restriction.TypeFullPlatformBan,
-		}, meta)
+		created = *createdRow
+		disconnectAfterCommit = fullBanCreated
+		disconnectUserID = user.ID
+		return nil
 	}); err != nil {
 		return nil, err
 	}
@@ -279,6 +225,112 @@ func (s *Service) CreateUserRestriction(ctx context.Context, actorID uint64, raw
 		s.socketDisconnecter.DisconnectUser(disconnectUserID)
 	}
 	return &created, nil
+}
+
+type CreateUserRestrictionTxInput struct {
+	ActorID         uint64
+	UserID          uint64
+	RestrictionType string
+	Reason          string
+	ExpiresAt       *time.Time
+	Meta            RequestMeta
+	Now             time.Time
+}
+
+func (s *Service) CreateUserRestrictionForUserTx(ctx context.Context, tx *gorm.DB, input CreateUserRestrictionTxInput) (*UserRestrictionResponse, error) {
+	restrictionType := strings.ToUpper(strings.TrimSpace(input.RestrictionType))
+	if !restriction.IsValidRestrictionType(restrictionType) {
+		return nil, validationError("restrictionType is invalid", map[string]any{"field": "restrictionType"})
+	}
+	reason, err := requireRestrictionReason(input.Reason)
+	if err != nil {
+		return nil, err
+	}
+	now := input.Now
+	if now.IsZero() {
+		now = time.Now().UTC()
+	}
+	if input.ExpiresAt != nil && !input.ExpiresAt.After(now) {
+		return nil, &ServiceError{Status: 409, Code: CodeUserRestrictionExpired, Message: "expiresAt must be in the future", Details: map[string]any{"field": "expiresAt"}}
+	}
+	user, err := s.mobileUserByIDTx(ctx, tx, input.UserID, true)
+	if err != nil {
+		return nil, err
+	}
+	created, _, err := s.createUserRestrictionTx(ctx, tx, input.ActorID, user, restrictionType, reason, input.ExpiresAt, input.Meta, now)
+	return created, err
+}
+
+func (s *Service) DisconnectRestrictedUser(userID uint64) {
+	if s.socketDisconnecter != nil {
+		s.socketDisconnecter.DisconnectUser(userID)
+	}
+}
+
+func (s *Service) createUserRestrictionTx(ctx context.Context, tx *gorm.DB, actorID uint64, user mobileUserIdentity, restrictionType string, reason string, expiresAt *time.Time, meta RequestMeta, now time.Time) (*UserRestrictionResponse, bool, error) {
+	if err := s.expireActiveRestrictionsTx(ctx, tx, user.ID, user.UUID, restrictionType, now); err != nil {
+		return nil, false, err
+	}
+	var exists bool
+	if err := tx.WithContext(ctx).Raw(`
+		SELECT EXISTS (
+		  SELECT 1
+		  FROM user_restrictions
+		  WHERE user_id = ?
+		    AND restriction_type = ?
+		    AND status = ?
+		    AND (expires_at IS NULL OR expires_at > ?)
+		)
+	`, user.ID, restrictionType, restriction.StatusActive, now).Scan(&exists).Error; err != nil {
+		return nil, false, err
+	}
+	if exists {
+		return nil, false, conflictCodeError(CodeUserAlreadyRestricted, "User already has an active restriction")
+	}
+
+	row := UserRestriction{
+		UUID:                 uuid.New(),
+		UserID:               user.ID,
+		RestrictionType:      restrictionType,
+		Status:               restriction.StatusActive,
+		Reason:               reason,
+		CreatedByAdminUserID: actorID,
+		ExpiresAt:            expiresAt,
+		CreatedAt:            now,
+		UpdatedAt:            now,
+	}
+	if err := tx.WithContext(ctx).Create(&row).Error; err != nil {
+		return nil, false, err
+	}
+	sessionsRevoked := int64(0)
+	fullPlatformBan := restrictionType == restriction.TypeFullPlatformBan
+	if fullPlatformBan {
+		result := tx.WithContext(ctx).Exec(`
+			UPDATE user_sessions
+			SET revoked_at = ?, updated_at = ?
+			WHERE user_id = ?
+			  AND revoked_at IS NULL
+		`, now, now, user.ID)
+		if result.Error != nil {
+			return nil, false, result.Error
+		}
+		sessionsRevoked = result.RowsAffected
+	}
+	created, err := s.userRestrictionRowsByID(ctx, tx, row.ID)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := insertAdminAuditLogTx(ctx, tx, &actorID, AuditActorAdmin, "USER_RESTRICTION_CREATED", auditResourceUser, &user.UUID, &reason, map[string]any{}, map[string]any{
+		"restrictionUuid":  created.RestrictionUUID,
+		"restrictionType":  created.RestrictionType,
+		"status":           created.Status,
+		"expiresAt":        created.ExpiresAt,
+		"sessionsRevoked":  sessionsRevoked,
+		"socketDisconnect": fullPlatformBan,
+	}, meta); err != nil {
+		return nil, false, err
+	}
+	return &created, fullPlatformBan, nil
 }
 
 func (s *Service) RevokeUserRestriction(ctx context.Context, actorID uint64, rawUserUUID string, rawRestrictionUUID string, req RevokeUserRestrictionRequest, meta RequestMeta) (*UserRestrictionResponse, error) {
@@ -391,12 +443,23 @@ func (s *Service) mobileUserByUUIDTx(ctx context.Context, tx *gorm.DB, rawUserUU
 	if err != nil {
 		return mobileUserIdentity{}, err
 	}
+	return s.mobileUserByWhereTx(ctx, tx, "uuid = ?", parsed, lock)
+}
+
+func (s *Service) mobileUserByIDTx(ctx context.Context, tx *gorm.DB, userID uint64, lock bool) (mobileUserIdentity, error) {
+	if userID == 0 {
+		return mobileUserIdentity{}, userNotFoundError()
+	}
+	return s.mobileUserByWhereTx(ctx, tx, "id = ?", userID, lock)
+}
+
+func (s *Service) mobileUserByWhereTx(ctx context.Context, tx *gorm.DB, where string, arg any, lock bool) (mobileUserIdentity, error) {
 	query := tx.WithContext(ctx)
 	if lock {
 		query = query.Clauses(clause.Locking{Strength: "UPDATE"})
 	}
 	var user mobileUserIdentity
-	if err := query.Table("users").Select("id, uuid").Where("uuid = ?", parsed).Scan(&user).Error; err != nil {
+	if err := query.Table("users").Select("id, uuid").Where(where, arg).Scan(&user).Error; err != nil {
 		return mobileUserIdentity{}, err
 	}
 	if user.ID == 0 {

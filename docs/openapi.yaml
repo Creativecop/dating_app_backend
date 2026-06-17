@@ -969,6 +969,25 @@ paths:
         "403":
           $ref: "#/components/responses/Error"
 
+  /api/v1/admin/capabilities:
+    get:
+      tags: [Admin]
+      summary: Admin module capabilities
+      responses:
+        "200":
+          description: Enabled admin modules
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/schemas/ApiResponse"
+                  - type: object
+                    properties:
+                      data:
+                        $ref: "#/components/schemas/AdminCapabilitiesResponse"
+        "401":
+          $ref: "#/components/responses/Error"
+
   /api/v1/admin/admin-users:
     get:
       tags: [Admin]
@@ -1188,6 +1207,82 @@ paths:
         "409":
           $ref: "#/components/responses/Error"
 
+  /api/v1/admin/reports:
+    get:
+      tags: [Admin]
+      summary: List reports for admin review
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [PENDING, REVIEWED, DISMISSED, ACTIONED]
+        - name: targetType
+          in: query
+          schema:
+            type: string
+            enum: [USER, PROFILE, MESSAGE, MEDIA, MATCH]
+        - name: severity
+          in: query
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        - name: createdFrom
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: createdTo
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/Cursor"
+      responses:
+        "200":
+          $ref: "#/components/responses/PaginatedSuccess"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/reports/{reportId}:
+    get:
+      tags: [Admin]
+      summary: Report detail for admin review
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/reports/{reportId}/review:
+    post:
+      tags: [Admin]
+      summary: Review a pending report
+      parameters:
+        - $ref: "#/components/parameters/ReportId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewReportRequest"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+        "404":
+          $ref: "#/components/responses/Error"
+        "409":
+          $ref: "#/components/responses/Error"
+
   /api/v1/admin/audit-logs:
     get:
       tags: [Admin]
@@ -1335,6 +1430,13 @@ components:
         format: uuid
     RestrictionId:
       name: restrictionId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ReportId:
+      name: reportId
       in: path
       required: true
       schema:
@@ -1574,6 +1676,29 @@ components:
           items:
             type: string
 
+    AdminCapabilitiesResponse:
+      type: object
+      properties:
+        modules:
+          type: object
+          properties:
+            trustSafety:
+              type: boolean
+            wallet:
+              type: boolean
+            gift:
+              type: boolean
+            agency:
+              type: boolean
+            reseller:
+              type: boolean
+            live:
+              type: boolean
+            liveComments:
+              type: boolean
+            chatModeration:
+              type: boolean
+
     CreateAdminUserRequest:
       type: object
       required: [email, roles, reason]
@@ -1663,6 +1788,62 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    ReviewReportRequest:
+      type: object
+      required: [decision, reason]
+      properties:
+        decision:
+          type: string
+          enum: [REVIEWED, DISMISSED, ACTIONED]
+        reason:
+          type: string
+        note:
+          type: string
+          nullable: true
+        action:
+          $ref: "#/components/schemas/ReviewReportAction"
+
+    ReviewReportAction:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [NONE, RESTRICT_USER, HIDE_COMMENT, FORCE_END_LIVE, HIDE_CHAT_MESSAGE]
+          description: Only NONE and RESTRICT_USER are currently available.
+        restrictionType:
+          type: string
+          enum:
+            - FULL_PLATFORM_BAN
+            - LIVE_CREATE_BAN
+            - COMMENT_BAN
+            - GIFT_SEND_BAN
+            - RESELLER_OPERATION_BAN
+            - AGENCY_OPERATION_BAN
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    AdminReport:
+      type: object
+      properties:
+        reportUuid:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [PENDING, REVIEWED, DISMISSED, ACTIONED]
+        targetType:
+          type: string
+        targetUuid:
+          type: string
+          format: uuid
+        reasonCode:
+          type: string
+        severity:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
 
     AdminReviewPaymentRequest:
       type: object

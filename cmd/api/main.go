@@ -94,6 +94,7 @@ func main() {
 	discoveryService.SetMatchNotificationDispatcher(notificationService)
 	discoveryService.SetBlockChecker(safetyService)
 	matchService.SetBlockChecker(safetyService)
+	safetyService.SetAdminOperations(adminService)
 	chatService.SetNotificationDispatcher(notificationService)
 	mediaService := media.NewService(db, storageProvider, queueClient, cfg.Media)
 	mediaService.SetDiscoveryEligibilityRefresher(profileService)
@@ -115,6 +116,16 @@ func main() {
 	chatHandler := chat.NewHandler(chatService, chatHub, authService)
 	chatHandler.SetRestrictionChecker(restrictionService)
 	adminService.SetUserSocketDisconnecter(chatHub)
+	adminService.SetModuleCapabilities(admin.AdminModuleCapabilities{
+		TrustSafety:    true,
+		Wallet:         false,
+		Gift:           false,
+		Agency:         false,
+		Reseller:       false,
+		Live:           false,
+		LiveComments:   false,
+		ChatModeration: false,
+	})
 	notificationHandler := notification.NewHandler(notificationService)
 	safetyHandler := safety.NewHandler(safetyService)
 	mediaHandler := media.NewHandler(mediaService, cfg.Media)
