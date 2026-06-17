@@ -1,8 +1,8 @@
 openapi: 3.0.3
 info:
-  title: Aura Mobile API
+  title: Aura Backend API
   version: 1.0.0
-  description: Mobile-facing API contract for the Aura backend.
+  description: Testable API contract for the Aura backend, including mobile and admin routes.
 servers:
   - url: http://localhost:8080
     description: Local development
@@ -22,6 +22,19 @@ tags:
 security:
   - bearerAuth: []
 paths:
+  /health:
+    get:
+      tags: [Health]
+      summary: Root health check
+      security: []
+      responses:
+        "200":
+          description: Health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiResponse"
+
   /api/v1/health:
     get:
       tags: [Health]
@@ -813,6 +826,8 @@ paths:
     post:
       tags: [Subscriptions]
       summary: Submit manual payment request
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -930,6 +945,7 @@ paths:
       summary: Approve manual payment request
       parameters:
         - $ref: "#/components/parameters/PaymentRequestUuid"
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         content:
           application/json:
@@ -947,6 +963,7 @@ paths:
       summary: Reject manual payment request
       parameters:
         - $ref: "#/components/parameters/PaymentRequestUuid"
+        - $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
@@ -986,6 +1003,106 @@ paths:
                       data:
                         $ref: "#/components/schemas/AdminCapabilitiesResponse"
         "401":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/dashboard/summary:
+    get:
+      tags: [Admin]
+      summary: Permission-filtered admin dashboard summary
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/analytics/users:
+    get:
+      tags: [Admin]
+      summary: User analytics
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsFrom"
+        - $ref: "#/components/parameters/AnalyticsTo"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/analytics/reports:
+    get:
+      tags: [Admin]
+      summary: Report analytics
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsFrom"
+        - $ref: "#/components/parameters/AnalyticsTo"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/analytics/restrictions:
+    get:
+      tags: [Admin]
+      summary: User restriction analytics
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsFrom"
+        - $ref: "#/components/parameters/AnalyticsTo"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/analytics/trust-safety:
+    get:
+      tags: [Admin]
+      summary: Trust and Safety analytics
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsFrom"
+        - $ref: "#/components/parameters/AnalyticsTo"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/analytics/admin-activity:
+    get:
+      tags: [Admin]
+      summary: Aggregated admin activity analytics
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsFrom"
+        - $ref: "#/components/parameters/AnalyticsTo"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
+          $ref: "#/components/responses/Error"
+
+  /api/v1/admin/analytics/subscription-payments:
+    get:
+      tags: [Admin]
+      summary: Aggregate subscription payment analytics
+      parameters:
+        - $ref: "#/components/parameters/AnalyticsFrom"
+        - $ref: "#/components/parameters/AnalyticsTo"
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+        "400":
+          $ref: "#/components/responses/Error"
+        "403":
           $ref: "#/components/responses/Error"
 
   /api/v1/admin/admin-users:
@@ -1297,6 +1414,23 @@ paths:
           in: query
           schema:
             type: string
+        - name: actorAdminUserId
+          in: query
+          description: Alias for adminUserUuid.
+          schema:
+            type: string
+            format: uuid
+        - name: actorAdminUserUuid
+          in: query
+          description: Alias for adminUserUuid.
+          schema:
+            type: string
+            format: uuid
+        - name: actionType
+          in: query
+          description: Alias for action.
+          schema:
+            type: string
         - name: resourceType
           in: query
           schema:
@@ -1313,6 +1447,18 @@ paths:
             format: date-time
         - name: createdTo
           in: query
+          schema:
+            type: string
+            format: date-time
+        - name: from
+          in: query
+          description: Alias for createdFrom.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: Alias for createdTo.
           schema:
             type: string
             format: date-time
@@ -1358,6 +1504,30 @@ components:
       required: false
       schema:
         type: string
+    AnalyticsFrom:
+      name: from
+      in: query
+      required: false
+      description: Inclusive range start. Defaults to the start of the current UTC day minus 29 days.
+      schema:
+        type: string
+        format: date-time
+    AnalyticsTo:
+      name: to
+      in: query
+      required: false
+      description: Exclusive range end. Defaults to the start of the next UTC day.
+      schema:
+        type: string
+        format: date-time
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+      description: Required for payment-like mutations.
     UserUuid:
       name: userUuid
       in: path
