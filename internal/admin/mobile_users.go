@@ -77,6 +77,8 @@ func (s *Service) ListUsers(ctx context.Context, query AdminMobileUserListQuery)
 
 	where := []string{"1 = 1"}
 	args := make([]any, 0)
+	var createdFromValue *time.Time
+	var createdToValue *time.Time
 	search := strings.TrimSpace(query.Search)
 	if search != "" {
 		where = append(where, `(u.uuid::text ILIKE ? OR u.phone ILIKE ? OR u.email::text ILIKE ? OR p.display_name ILIKE ?)`)
@@ -96,6 +98,7 @@ func (s *Service) ListUsers(ctx context.Context, query AdminMobileUserListQuery)
 		if err != nil {
 			return nil, validationError("createdFrom must be RFC3339", map[string]any{"field": "createdFrom"})
 		}
+		createdFromValue = &createdFrom
 		where = append(where, "u.created_at >= ?")
 		args = append(args, createdFrom)
 	}
@@ -104,8 +107,12 @@ func (s *Service) ListUsers(ctx context.Context, query AdminMobileUserListQuery)
 		if err != nil {
 			return nil, validationError("createdTo must be RFC3339", map[string]any{"field": "createdTo"})
 		}
+		createdToValue = &createdTo
 		where = append(where, "u.created_at <= ?")
 		args = append(args, createdTo)
+	}
+	if err := validateRFC3339DateRange(createdFromValue, createdToValue); err != nil {
+		return nil, err
 	}
 	if cursor != nil {
 		where = append(where, "(u.created_at < ? OR (u.created_at = ? AND u.id < ?))")

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/url"
+	"reflect"
 	"strings"
 	"time"
 
@@ -72,6 +73,10 @@ func Logger(appEnv ...string) gin.HandlerFunc {
 			c.Writer.Status(),
 			latency,
 			c.ClientIP(),
+			c.FullPath(),
+			contextUintField(c, "auth_user", "UserID"),
+			contextUintField(c, "admin_user", "AdminUserID"),
+			responseErrorCode(capture.body.Bytes()),
 			requestBody,
 			responseBody,
 		))
@@ -201,6 +206,13 @@ func isSensitiveLogField(field string, request bool) bool {
 		"email",
 		"latitude",
 		"longitude",
+		"payment_reference",
+		"paymentreference",
+		"screenshot",
+		"internal_ops",
+		"internalops",
+		"ops_key",
+		"opskey",
 	}
 	for _, part := range sensitiveContains {
 		if strings.Contains(key, part) {
@@ -213,21 +225,78 @@ func isSensitiveLogField(field string, request bool) bool {
 	return false
 }
 
-func prettyHTTPLog(requestID string, method string, path string, status int, latency time.Duration, ip string, requestBody string, responseBody string) string {
-	var builder strings.Builder
-	builder.WriteString("\n")
-	builder.WriteString("========== HTTP ==========\n")
-	builder.WriteString(fmt.Sprintf("--> %s %s\n", method, path))
-	builder.WriteString(fmt.Sprintf("    request_id: %s\n", requestID))
-	builder.WriteString(fmt.Sprintf("    ip: %s\n", ip))
+func prettyHTTPLog(requestID string, method string, path string, status int, latency time.Duration, ip string, route string, userID *uint64, adminUserID *uint64, errorCode string, requestBody string, responseBody string) string {
+	record := map[string]any{
+		"event":       "http_request",
+		"request_id":  requestID,
+		"method":      method,
+		"path":        path,
+		"route":       route,
+		"status":      status,
+		"duration_ms": latency.Milliseconds(),
+		"ip":          ip,
+	}
+	if errorCode != "" {
+		record["error_code"] = errorCode
+	}
+	if userID != nil {
+		record["user_id"] = *userID
+	}
+	if adminUserID != nil {
+		record["admin_user_id"] = *adminUserID
+	}
 	if requestBody != "" {
-		builder.WriteString(fmt.Sprintf("    request: %s\n", requestBody))
+		record["request"] = requestBody
 	}
-	builder.WriteString(fmt.Sprintf("<-- %d %s %s\n", status, method, path))
-	builder.WriteString(fmt.Sprintf("    latency: %s\n", latency.String()))
 	if responseBody != "" {
-		builder.WriteString(fmt.Sprintf("    response: %s\n", responseBody))
+		record["response"] = responseBody
 	}
-	builder.WriteString("==========================")
-	return builder.String()
+	encoded, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Sprintf(`{"event":"http_request","request_id":%q,"method":%q,"path":%q,"status":%d}`, requestID, method, path, status)
+	}
+	return string(encoded)
+}
+
+func responseErrorCode(body []byte) string {
+	if len(bytes.TrimSpace(body)) == 0 || !json.Valid(bytes.TrimSpace(body)) {
+		return ""
+	}
+	var payload struct {
+		Error *struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(bytes.TrimSpace(body), &payload); err != nil || payload.Error == nil {
+		return ""
+	}
+	return payload.Error.Code
+}
+
+func contextUintField(c *gin.Context, key string, field string) *uint64 {
+	value, ok := c.Get(key)
+	if !ok {
+		return nil
+	}
+	reflected := reflect.ValueOf(value)
+	if reflected.Kind() == reflect.Pointer {
+		if reflected.IsNil() {
+			return nil
+		}
+		reflected = reflected.Elem()
+	}
+	if reflected.Kind() != reflect.Struct {
+		return nil
+	}
+	fieldValue := reflected.FieldByName(field)
+	if !fieldValue.IsValid() {
+		return nil
+	}
+	switch fieldValue.Kind() {
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		value := fieldValue.Uint()
+		return &value
+	default:
+		return nil
+	}
 }

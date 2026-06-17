@@ -135,6 +135,7 @@ func main() {
 
 	engine := router.New(router.Dependencies{
 		Config:              cfg,
+		RedisClient:         redisClient,
 		HealthHandler:       healthHandler,
 		AuthHandler:         authHandler,
 		AuthService:         authService,

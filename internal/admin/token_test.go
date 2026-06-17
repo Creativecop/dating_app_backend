@@ -7,6 +7,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 
+	authpkg "github.com/neoscoder/aura-backend/internal/auth"
 	"github.com/neoscoder/aura-backend/internal/config"
 )
 
@@ -54,5 +55,45 @@ func TestAdminRefreshSessionStateValidRejectsOldSession(t *testing.T) {
 
 	if adminRefreshSessionStateValid(AdminUser{TokenVersion: 1, PasswordChangedAt: &changedAt}, changedAt.Add(-time.Second)) {
 		t.Fatal("old refresh session was accepted")
+	}
+}
+
+func TestAdminAndMobileAccessTokensAreSeparated(t *testing.T) {
+	adminTokenService := NewTokenService(config.JWTConfig{
+		Secret:              "admin-secret-for-token-separation",
+		AccessExpireMinutes: 15,
+		Issuer:              "admin-test",
+		Audience:            "admin-panel",
+	})
+	mobileTokenService := authpkg.NewTokenService(config.JWTConfig{
+		Secret:              "mobile-secret-for-token-separation",
+		AccessExpireMinutes: 15,
+		Issuer:              "mobile-test",
+		Audience:            "mobile-app",
+	})
+
+	adminRaw, err := adminTokenService.GenerateAccessToken(AdminUser{
+		UUID:         uuid.New(),
+		Email:        "admin@example.com",
+		TokenVersion: 1,
+	}, AdminSession{UUID: uuid.New()}, []string{RoleSuperAdmin})
+	if err != nil {
+		t.Fatalf("GenerateAccessToken(admin) returned error: %v", err)
+	}
+	mobileRaw, err := mobileTokenService.GenerateAccessToken(authpkg.User{
+		ID:               1,
+		UUID:             uuid.New(),
+		Status:           authpkg.UserStatusActive,
+		OnboardingStatus: authpkg.OnboardingCompleted,
+	}, authpkg.UserSession{ID: 10, UUID: uuid.New(), UserID: 1})
+	if err != nil {
+		t.Fatalf("GenerateAccessToken(mobile) returned error: %v", err)
+	}
+
+	if _, err := adminTokenService.ParseAccessToken(mobileRaw); err == nil {
+		t.Fatal("admin token parser accepted mobile access token")
+	}
+	if _, err := mobileTokenService.ParseAccessToken(adminRaw); err == nil {
+		t.Fatal("mobile token parser accepted admin access token")
 	}
 }

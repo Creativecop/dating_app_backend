@@ -44,6 +44,8 @@ func (s *Service) ListAuditLogs(ctx context.Context, query AuditLogListQuery) (*
 
 	where := []string{"1 = 1"}
 	args := make([]any, 0)
+	var createdFromValue *time.Time
+	var createdToValue *time.Time
 	if strings.TrimSpace(query.AdminUserUUID) != "" {
 		adminUUID, err := uuid.Parse(strings.TrimSpace(query.AdminUserUUID))
 		if err != nil {
@@ -73,6 +75,7 @@ func (s *Service) ListAuditLogs(ctx context.Context, query AuditLogListQuery) (*
 		if err != nil {
 			return nil, validationError("createdFrom must be RFC3339", map[string]any{"field": "createdFrom"})
 		}
+		createdFromValue = &createdFrom
 		where = append(where, "al.created_at >= ?")
 		args = append(args, createdFrom)
 	}
@@ -81,8 +84,12 @@ func (s *Service) ListAuditLogs(ctx context.Context, query AuditLogListQuery) (*
 		if err != nil {
 			return nil, validationError("createdTo must be RFC3339", map[string]any{"field": "createdTo"})
 		}
+		createdToValue = &createdTo
 		where = append(where, "al.created_at <= ?")
 		args = append(args, createdTo)
+	}
+	if err := validateRFC3339DateRange(createdFromValue, createdToValue); err != nil {
+		return nil, err
 	}
 	if cursor != nil {
 		where = append(where, "(al.created_at < ? OR (al.created_at = ? AND al.id < ?))")

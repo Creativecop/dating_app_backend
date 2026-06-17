@@ -112,6 +112,19 @@ func analyticsRangeError(message string) *ServiceError {
 	return &ServiceError{Status: 400, Code: CodeAdminAnalyticsRangeInvalid, Message: message}
 }
 
+func validateRFC3339DateRange(from *time.Time, to *time.Time) error {
+	if from == nil || to == nil {
+		return nil
+	}
+	if !from.Before(*to) {
+		return validationError("createdFrom must be before createdTo", map[string]any{"field": "createdFrom"})
+	}
+	if to.Sub(*from) > maxAnalyticsRangeDays*24*time.Hour {
+		return validationError("Date range cannot exceed 366 days", map[string]any{"field": "createdTo"})
+	}
+	return nil
+}
+
 func encodeAdminUserListCursor(cursor adminUserListCursor) (string, error) {
 	payload, err := json.Marshal(cursor)
 	if err != nil {

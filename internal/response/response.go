@@ -2,6 +2,7 @@ package response
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -15,8 +16,9 @@ type Body struct {
 }
 
 type ErrorBody struct {
-	Code    string `json:"code"`
-	Details any    `json:"details,omitempty"`
+	Code              string `json:"code"`
+	RetryAfterSeconds *int64 `json:"retryAfterSeconds,omitempty"`
+	Details           any    `json:"details,omitempty"`
 }
 
 func Success(c *gin.Context, status int, message string, data any) {
@@ -71,6 +73,22 @@ func NotFound(c *gin.Context, message string) {
 
 func TooManyRequests(c *gin.Context, message string) {
 	Error(c, http.StatusTooManyRequests, message, "RATE_LIMITED", nil)
+}
+
+func RateLimited(c *gin.Context, retryAfterSeconds int64) {
+	if retryAfterSeconds < 1 {
+		retryAfterSeconds = 1
+	}
+	c.Header("Retry-After", strconv.FormatInt(retryAfterSeconds, 10))
+	c.JSON(http.StatusTooManyRequests, Body{
+		Success:    false,
+		StatusCode: http.StatusTooManyRequests,
+		Message:    "Too many requests",
+		Error: &ErrorBody{
+			Code:              "RATE_LIMITED",
+			RetryAfterSeconds: &retryAfterSeconds,
+		},
+	})
 }
 
 func Internal(c *gin.Context) {

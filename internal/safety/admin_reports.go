@@ -68,6 +68,8 @@ func (s *Service) AdminListReports(ctx context.Context, query AdminReportListQue
 
 	where := []string{"1 = 1"}
 	args := make([]any, 0)
+	var createdFromValue *time.Time
+	var createdToValue *time.Time
 	if strings.TrimSpace(query.Status) != "" {
 		status := strings.ToUpper(strings.TrimSpace(query.Status))
 		if !validReportStatus(status) {
@@ -97,6 +99,7 @@ func (s *Service) AdminListReports(ctx context.Context, query AdminReportListQue
 		if err != nil {
 			return nil, validationError("createdFrom must be RFC3339", map[string]any{"field": "createdFrom"})
 		}
+		createdFromValue = &createdFrom
 		where = append(where, "r.created_at >= ?")
 		args = append(args, createdFrom)
 	}
@@ -105,8 +108,12 @@ func (s *Service) AdminListReports(ctx context.Context, query AdminReportListQue
 		if err != nil {
 			return nil, validationError("createdTo must be RFC3339", map[string]any{"field": "createdTo"})
 		}
+		createdToValue = &createdTo
 		where = append(where, "r.created_at <= ?")
 		args = append(args, createdTo)
+	}
+	if err := validateAdminReportDateRange(createdFromValue, createdToValue); err != nil {
+		return nil, err
 	}
 	if cursor != nil {
 		where = append(where, "(r.created_at < ? OR (r.created_at = ? AND r.id < ?))")

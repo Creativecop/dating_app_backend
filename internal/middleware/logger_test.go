@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -48,5 +50,39 @@ func TestSanitizeBodyKeepsResponseErrorCode(t *testing.T) {
 	got := sanitizeBody([]byte(`{"success":false,"error":{"code":"VALIDATION_ERROR"}}`), false)
 	if !strings.Contains(got, "VALIDATION_ERROR") {
 		t.Fatalf("expected response error code to be preserved: %s", got)
+	}
+}
+
+func TestPrettyHTTPLogIsStructuredAndRedacted(t *testing.T) {
+	userID := uint64(12)
+	adminUserID := uint64(34)
+	got := prettyHTTPLog(
+		"req-1",
+		http.MethodPost,
+		"/api/v1/admin/auth/login",
+		http.StatusBadRequest,
+		25*time.Millisecond,
+		"127.0.0.1",
+		"/api/v1/admin/auth/login",
+		&userID,
+		&adminUserID,
+		"VALIDATION_ERROR",
+		sanitizeBody([]byte(`{"email":"admin@example.com","password":"secret","name":"ok"}`), true),
+		`{"success":false,"error":{"code":"VALIDATION_ERROR"}}`,
+	)
+
+	var record map[string]any
+	if err := json.Unmarshal([]byte(got), &record); err != nil {
+		t.Fatalf("log is not JSON: %v: %s", err, got)
+	}
+	if record["event"] != "http_request" || record["request_id"] != "req-1" || record["error_code"] != "VALIDATION_ERROR" {
+		t.Fatalf("unexpected log fields: %#v", record)
+	}
+	request, _ := record["request"].(string)
+	if strings.Contains(request, "admin@example.com") || strings.Contains(request, "secret") {
+		t.Fatalf("sensitive request values leaked: %s", request)
+	}
+	if !strings.Contains(request, `"name":"ok"`) {
+		t.Fatalf("non-sensitive request value missing: %s", request)
 	}
 }

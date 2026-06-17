@@ -23,6 +23,8 @@ type Config struct {
 	Discovery    DiscoveryConfig
 	Notification NotificationConfig
 	CORS         CORSConfig
+	RateLimit    RateLimitConfig
+	Request      RequestConfig
 }
 
 type AppConfig struct {
@@ -93,6 +95,50 @@ type EmailConfig struct {
 
 type CORSConfig struct {
 	AllowedOrigins []string
+}
+
+type RateLimitConfig struct {
+	Enabled              bool
+	RedisRequiredForAuth bool
+
+	AdminLoginEmail15M int
+	AdminLoginIP15M    int
+	AdminLoginIP1H     int
+
+	OTPRequestIdentifier10M int
+	OTPRequestIdentifier1H  int
+	OTPRequestIP1H          int
+	OTPVerifyIdentifier10M  int
+	OTPVerifyIP1H           int
+
+	RefreshSubject1M int
+	RefreshIP1M      int
+
+	ReportCreateUser1M int
+	ReportCreateUser1H int
+	ReportCreateIP1H   int
+
+	AdminReview1M              int
+	AdminReview1H              int
+	AdminRestrictionMutation1M int
+	AdminRestrictionMutation1H int
+	AdminIdentityMutation10M   int
+	AdminIdentityMutation1H    int
+	AdminReadAdmin1M           int
+	AdminReadIP1M              int
+
+	SubscriptionSubmitUser10M int
+	SubscriptionSubmitUser1H  int
+	SubscriptionSubmitIP1H    int
+	SubscriptionReviewAdmin1M int
+	SubscriptionReviewAdmin1H int
+
+	SocketConnectUser1M int
+	SocketConnectIP1M   int
+}
+
+type RequestConfig struct {
+	JSONBodyLimitBytes int64
 }
 
 type MediaConfig struct {
@@ -171,8 +217,8 @@ func Load() (*Config, error) {
 			ExpireMinutes:         envInt("OTP_EXPIRE_MINUTES", 5),
 			ResendCooldownSeconds: envInt("OTP_RESEND_COOLDOWN_SECONDS", 60),
 			MaxAttempts:           envInt("OTP_MAX_ATTEMPTS", 5),
-			MaxPerIdentifierHour:  envInt("OTP_MAX_PER_IDENTIFIER_HOUR", 5),
-			MaxPerIPHour:          envInt("OTP_MAX_PER_IP_HOUR", 20),
+			MaxPerIdentifierHour:  envInt("OTP_MAX_PER_IDENTIFIER_HOUR", 10),
+			MaxPerIPHour:          envInt("OTP_MAX_PER_IP_HOUR", 30),
 			Provider:              strings.ToLower(env("OTP_PROVIDER", "noop")),
 			DevBypassEnabled:      envBool("OTP_DEV_BYPASS_ENABLED", false),
 			DevBypassCode:         env("OTP_DEV_BYPASS_CODE", "123456"),
@@ -229,6 +275,48 @@ func Load() (*Config, error) {
 		CORS: CORSConfig{
 			AllowedOrigins: splitCSV(env("CORS_ALLOWED_ORIGINS", "*")),
 		},
+		RateLimit: RateLimitConfig{
+			Enabled:              envBool("RATE_LIMIT_ENABLED", true),
+			RedisRequiredForAuth: envBool("RATE_LIMIT_REDIS_REQUIRED_FOR_AUTH", true),
+
+			AdminLoginEmail15M: envInt("RATE_LIMIT_ADMIN_LOGIN_EMAIL_15M", 5),
+			AdminLoginIP15M:    envInt("RATE_LIMIT_ADMIN_LOGIN_IP_15M", 10),
+			AdminLoginIP1H:     envInt("RATE_LIMIT_ADMIN_LOGIN_IP_1H", 30),
+
+			OTPRequestIdentifier10M: envInt("RATE_LIMIT_OTP_REQUEST_IDENTIFIER_10M", 3),
+			OTPRequestIdentifier1H:  envInt("RATE_LIMIT_OTP_REQUEST_IDENTIFIER_1H", 10),
+			OTPRequestIP1H:          envInt("RATE_LIMIT_OTP_REQUEST_IP_1H", 30),
+			OTPVerifyIdentifier10M:  envInt("RATE_LIMIT_OTP_VERIFY_IDENTIFIER_10M", 5),
+			OTPVerifyIP1H:           envInt("RATE_LIMIT_OTP_VERIFY_IP_1H", 20),
+
+			RefreshSubject1M: envInt("RATE_LIMIT_REFRESH_SUBJECT_1M", 30),
+			RefreshIP1M:      envInt("RATE_LIMIT_REFRESH_IP_1M", 120),
+
+			ReportCreateUser1M: envInt("RATE_LIMIT_REPORT_CREATE_USER_1M", 5),
+			ReportCreateUser1H: envInt("RATE_LIMIT_REPORT_CREATE_USER_1H", 20),
+			ReportCreateIP1H:   envInt("RATE_LIMIT_REPORT_CREATE_IP_1H", 60),
+
+			AdminReview1M:              envInt("RATE_LIMIT_ADMIN_REVIEW_1M", 30),
+			AdminReview1H:              envInt("RATE_LIMIT_ADMIN_REVIEW_1H", 300),
+			AdminRestrictionMutation1M: envInt("RATE_LIMIT_ADMIN_RESTRICTION_MUTATION_1M", 20),
+			AdminRestrictionMutation1H: envInt("RATE_LIMIT_ADMIN_RESTRICTION_MUTATION_1H", 100),
+			AdminIdentityMutation10M:   envInt("RATE_LIMIT_ADMIN_IDENTITY_MUTATION_10M", 10),
+			AdminIdentityMutation1H:    envInt("RATE_LIMIT_ADMIN_IDENTITY_MUTATION_1H", 30),
+			AdminReadAdmin1M:           envInt("RATE_LIMIT_ADMIN_READ_ADMIN_1M", 120),
+			AdminReadIP1M:              envInt("RATE_LIMIT_ADMIN_READ_IP_1M", 600),
+
+			SubscriptionSubmitUser10M: envInt("RATE_LIMIT_SUBSCRIPTION_SUBMIT_USER_10M", 3),
+			SubscriptionSubmitUser1H:  envInt("RATE_LIMIT_SUBSCRIPTION_SUBMIT_USER_1H", 10),
+			SubscriptionSubmitIP1H:    envInt("RATE_LIMIT_SUBSCRIPTION_SUBMIT_IP_1H", 30),
+			SubscriptionReviewAdmin1M: envInt("RATE_LIMIT_SUBSCRIPTION_REVIEW_ADMIN_1M", 30),
+			SubscriptionReviewAdmin1H: envInt("RATE_LIMIT_SUBSCRIPTION_REVIEW_ADMIN_1H", 300),
+
+			SocketConnectUser1M: envInt("RATE_LIMIT_SOCKET_CONNECT_USER_1M", 20),
+			SocketConnectIP1M:   envInt("RATE_LIMIT_SOCKET_CONNECT_IP_1M", 60),
+		},
+		Request: RequestConfig{
+			JSONBodyLimitBytes: int64(envInt("REQUEST_JSON_BODY_LIMIT_BYTES", 1048576)),
+		},
 	}
 
 	if cfg.OTP.Length < 4 || cfg.OTP.Length > 10 {
@@ -236,6 +324,35 @@ func Load() (*Config, error) {
 	}
 	if cfg.App.Env == "production" && cfg.OTP.DevBypassEnabled {
 		return nil, fmt.Errorf("OTP_DEV_BYPASS_ENABLED cannot be true in production")
+	}
+	if cfg.App.Env == "production" {
+		if !databaseConfiguredForProduction() {
+			return nil, fmt.Errorf("DATABASE_URL or database connection settings are required in production")
+		}
+		if !redisConfiguredForProduction() {
+			return nil, fmt.Errorf("REDIS_HOST and REDIS_PORT are required in production")
+		}
+		if cfg.CORS.allowsWildcard() {
+			return nil, fmt.Errorf("CORS_ALLOWED_ORIGINS cannot be * in production")
+		}
+		if err := validateProductionSecret("JWT_SECRET", cfg.JWT.Secret, "change_this_secret"); err != nil {
+			return nil, err
+		}
+		if err := validateProductionSecret("ADMIN_JWT_SECRET", cfg.AdminJWT.Secret, "change_this_admin_secret"); err != nil {
+			return nil, err
+		}
+		if err := validateProductionSecret("OTP_SECRET", cfg.OTP.Secret, "change_this_otp_secret"); err != nil {
+			return nil, err
+		}
+		if cfg.JWT.Secret == cfg.AdminJWT.Secret || cfg.JWT.Secret == cfg.OTP.Secret || cfg.AdminJWT.Secret == cfg.OTP.Secret {
+			return nil, fmt.Errorf("JWT_SECRET, ADMIN_JWT_SECRET, and OTP_SECRET must be distinct in production")
+		}
+		if !cfg.RateLimit.Enabled {
+			return nil, fmt.Errorf("RATE_LIMIT_ENABLED must be true in production")
+		}
+	}
+	if cfg.Request.JSONBodyLimitBytes < 1024 {
+		return nil, fmt.Errorf("REQUEST_JSON_BODY_LIMIT_BYTES must be at least 1024")
 	}
 	if cfg.Discovery.LocationMaxAgeDays < 1 {
 		return nil, fmt.Errorf("DISCOVERY_LOCATION_MAX_AGE_DAYS must be at least 1")
@@ -292,6 +409,43 @@ func (c OTPConfig) ExpiryTTL() time.Duration {
 
 func (c OTPConfig) ResendCooldownTTL() time.Duration {
 	return time.Duration(c.ResendCooldownSeconds) * time.Second
+}
+
+func (c CORSConfig) allowsWildcard() bool {
+	for _, origin := range c.AllowedOrigins {
+		if strings.TrimSpace(origin) == "*" {
+			return true
+		}
+	}
+	return false
+}
+
+func validateProductionSecret(name string, value string, placeholder string) error {
+	value = strings.TrimSpace(value)
+	if value == "" || value == placeholder || strings.HasPrefix(value, "change_this") {
+		return fmt.Errorf("%s must be set to a strong production secret", name)
+	}
+	if len(value) < 32 {
+		return fmt.Errorf("%s must be at least 32 characters in production", name)
+	}
+	return nil
+}
+
+func databaseConfiguredForProduction() bool {
+	if strings.TrimSpace(os.Getenv("DATABASE_URL")) != "" {
+		return true
+	}
+	required := []string{"DB_HOST", "DB_PORT", "DB_USER", "DB_PASSWORD", "DB_NAME"}
+	for _, key := range required {
+		if strings.TrimSpace(os.Getenv(key)) == "" {
+			return false
+		}
+	}
+	return true
+}
+
+func redisConfiguredForProduction() bool {
+	return strings.TrimSpace(os.Getenv("REDIS_HOST")) != "" && strings.TrimSpace(os.Getenv("REDIS_PORT")) != ""
 }
 
 func env(key, fallback string) string {

@@ -1,0 +1,12 @@
+.git
+.DS_Store
+.env
+.env.*
+!/.env.example
+storage/
+tmp/
+coverage.out
+*.test
+backup_before_release.sql
+backups/
+node_modules/
