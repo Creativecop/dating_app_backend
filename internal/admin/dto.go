@@ -12,6 +12,7 @@ const ContextAdminKey = "admin_user"
 type RequestMeta struct {
 	IPAddress string
 	UserAgent string
+	RequestID string
 }
 
 type AuthenticatedAdmin struct {
@@ -267,6 +268,7 @@ type AuditLogResponse struct {
 	Reason         *string         `json:"reason,omitempty"`
 	BeforeSnapshot json.RawMessage `json:"beforeSnapshot"`
 	AfterSnapshot  json.RawMessage `json:"afterSnapshot"`
+	RequestID      *string         `json:"requestId,omitempty"`
 	IPAddress      *string         `json:"ipAddress"`
 	UserAgent      *string         `json:"userAgent"`
 	CreatedAt      time.Time       `json:"createdAt"`

@@ -1,6 +1,10 @@
 package notification
 
-import "github.com/gin-gonic/gin"
+import (
+	"github.com/gin-gonic/gin"
+
+	"github.com/neoscoder/aura-backend/internal/middleware"
+)
 
 func RegisterRoutes(v1 *gin.RouterGroup, authMiddleware gin.HandlerFunc, handler *Handler) {
 	devices := v1.Group("/devices")
@@ -12,7 +16,7 @@ func RegisterRoutes(v1 *gin.RouterGroup, authMiddleware gin.HandlerFunc, handler
 	notifications.Use(authMiddleware)
 	notifications.GET("", handler.ListNotifications)
 	notifications.PATCH("/read-all", handler.MarkAllRead)
-	notifications.PATCH("/:notificationUuid/read", handler.MarkRead)
+	notifications.PATCH("/:notificationUuid/read", middleware.ValidateUUIDParams("notificationUuid"), handler.MarkRead)
 
 	settings := v1.Group("/notification-settings")
 	settings.Use(authMiddleware)

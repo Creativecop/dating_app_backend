@@ -27,6 +27,12 @@ Do not use `CORS_ALLOWED_ORIGINS=*` in production.
 
 ## Migrate
 
+Take a pre-release backup first:
+
+```bash
+pg_dump "$DATABASE_URL" > backup_before_release.sql
+```
+
 ```bash
 migrate -path migrations -database "$DATABASE_URL" up
 ```
@@ -60,6 +66,20 @@ Health:
 
 ```bash
 curl -fsS http://localhost:8080/health
+curl -fsS http://localhost:8080/api/v1/health
+```
+
+Smoke checks:
+
+```text
+Swagger is reachable at /swagger
+Mobile token cannot call /api/v1/admin/*
+Admin token cannot call mobile protected routes
+Admin capabilities keep games, pkBattle, and greedyGame false
+/api/v1/lives/test/pk/active and /api/v1/admin/pk-battles return normal 404s
+Payment-like mutations reject missing Idempotency-Key
+Invalid UUID path params return clean 400 responses
+Admin audit rows include request_id after admin mutations
 ```
 
 ## Rollback

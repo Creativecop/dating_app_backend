@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/neoscoder/aura-backend/internal/middleware"
 	"github.com/neoscoder/aura-backend/internal/response"
 )
 
@@ -388,7 +389,7 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 }
 
 func requestMeta(c *gin.Context) RequestMeta {
-	return RequestMeta{IPAddress: c.ClientIP(), UserAgent: c.Request.UserAgent()}
+	return RequestMeta{IPAddress: c.ClientIP(), UserAgent: c.Request.UserAgent(), RequestID: middleware.GetRequestID(c)}
 }
 
 func analyticsQuery(c *gin.Context) AnalyticsQuery {

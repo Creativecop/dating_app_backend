@@ -456,6 +456,7 @@ type normalizedPaymentRequest struct {
 type AdminMeta struct {
 	IPAddress string
 	UserAgent string
+	RequestID string
 }
 
 func normalizeCreatePaymentRequest(req CreateManualPaymentRequest) (normalizedPaymentRequest, error) {
@@ -699,16 +700,27 @@ func (s *Service) insertReviewAndAuditTx(ctx context.Context, tx *gorm.DB, reque
 	return tx.WithContext(ctx).Exec(`
 		INSERT INTO admin_audit_logs (
 		  admin_user_id,
+		  actor_type,
 		  action,
 		  resource_type,
 		  resource_uuid,
+		  reason,
 		  before_snapshot,
 		  after_snapshot,
+		  request_id,
 		  ip_address,
 		  user_agent
 		)
-		VALUES (?, ?, 'MANUAL_PAYMENT_REQUEST', ?, ?::jsonb, ?::jsonb, ?, ?)
-	`, adminID, auditAction, resourceUUID, string(beforeJSON), string(afterJSON), meta.IPAddress, meta.UserAgent).Error
+		VALUES (?, 'ADMIN', ?, 'MANUAL_PAYMENT_REQUEST', ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?)
+	`, adminID, auditAction, resourceUUID, note, string(beforeJSON), string(afterJSON), nullableString(meta.RequestID), meta.IPAddress, meta.UserAgent).Error
+}
+
+func nullableString(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
 }
 
 func planToResponse(plan SubscriptionPlan) (PlanResponse, error) {

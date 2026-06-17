@@ -7,6 +7,7 @@ import (
 
 	adminpkg "github.com/neoscoder/aura-backend/internal/admin"
 	"github.com/neoscoder/aura-backend/internal/auth"
+	appmiddleware "github.com/neoscoder/aura-backend/internal/middleware"
 	"github.com/neoscoder/aura-backend/internal/response"
 )
 
@@ -218,5 +219,5 @@ func currentAdmin(c *gin.Context) (adminpkg.AuthenticatedAdmin, bool) {
 }
 
 func adminMeta(c *gin.Context) adminpkg.RequestMeta {
-	return adminpkg.RequestMeta{IPAddress: c.ClientIP(), UserAgent: c.Request.UserAgent()}
+	return adminpkg.RequestMeta{IPAddress: c.ClientIP(), UserAgent: c.Request.UserAgent(), RequestID: appmiddleware.GetRequestID(c)}
 }

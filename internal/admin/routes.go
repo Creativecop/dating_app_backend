@@ -63,7 +63,7 @@ func RegisterRoutes(v1 *gin.RouterGroup, service *Service, handler *Handler, lim
 	auditRoutes := adminGroup.Group("/audit-logs")
 	auditRoutes.Use(Auth(service), RequirePasswordReady(), adminReadRateLimit(limiter, rateCfg), RequirePermissionCode(service, PermissionAuditRead, CodeAdminAuditAccessDenied))
 	auditRoutes.GET("", handler.ListAuditLogs)
-	auditRoutes.GET("/:auditLogUuid", handler.AuditLogDetail)
+	auditRoutes.GET("/:auditLogUuid", appmiddleware.ValidateUUIDParams("auditLogUuid"), handler.AuditLogDetail)
 
 	roleRoutes := adminGroup.Group("/roles")
 	roleRoutes.Use(Auth(service), RequirePasswordReady(), RequirePermission(service, PermissionRolesManage))

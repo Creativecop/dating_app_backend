@@ -22,6 +22,7 @@ type auditLogRow struct {
 	Reason            *string
 	BeforeSnapshotRaw string
 	AfterSnapshotRaw  string
+	RequestID         *string
 	IPAddress         *string
 	UserAgent         *string
 	CreatedAt         time.Time
@@ -201,6 +202,7 @@ func (s *Service) auditLogRows(ctx context.Context, where string, args ...any) (
 		  al.reason,
 		  al.before_snapshot::text AS before_snapshot_raw,
 		  al.after_snapshot::text AS after_snapshot_raw,
+		  al.request_id,
 		  al.ip_address,
 		  al.user_agent,
 		  al.created_at
@@ -235,6 +237,7 @@ func (row auditLogRow) toResponse() (AuditLogResponse, error) {
 		Reason:         row.Reason,
 		BeforeSnapshot: before,
 		AfterSnapshot:  after,
+		RequestID:      row.RequestID,
 		IPAddress:      row.IPAddress,
 		UserAgent:      row.UserAgent,
 		CreatedAt:      row.CreatedAt,
@@ -260,11 +263,12 @@ func insertAdminAuditLogTx(ctx context.Context, tx *gorm.DB, adminID *uint64, ac
 		  reason,
 		  before_snapshot,
 		  after_snapshot,
+		  request_id,
 		  ip_address,
 		  user_agent
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?)
-	`, adminID, actorType, action, resourceType, resourceUUID, reason, string(beforeJSON), string(afterJSON), meta.IPAddress, meta.UserAgent).Error
+		VALUES (?, ?, ?, ?, ?, ?, ?::jsonb, ?::jsonb, ?, ?, ?)
+	`, adminID, actorType, action, resourceType, resourceUUID, reason, string(beforeJSON), string(afterJSON), nullableString(meta.RequestID), meta.IPAddress, meta.UserAgent).Error
 }
 
 func (s *Service) InsertAuditLogTx(ctx context.Context, tx *gorm.DB, adminID *uint64, actorType string, action string, resourceType string, resourceUUID *uuid.UUID, reason *string, before any, after any, meta RequestMeta) error {
@@ -277,4 +281,12 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+func nullableString(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
 }

@@ -164,6 +164,7 @@ type AdminAuditLog struct {
 	Reason         *string
 	BeforeSnapshot []byte
 	AfterSnapshot  []byte
+	RequestID      *string
 	IPAddress      *string
 	UserAgent      *string
 	CreatedAt      time.Time

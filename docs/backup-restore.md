@@ -6,6 +6,7 @@ Run a logical backup before migrations, releases, or manual data fixes.
 
 ```bash
 mkdir -p backups
+pg_dump "$DATABASE_URL" > backup_before_release.sql
 pg_dump "$DATABASE_URL" \
 	--format=custom \
 	--file="backups/aura_$(date -u +%Y%m%dT%H%M%SZ).dump"

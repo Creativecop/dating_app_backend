@@ -15,6 +15,14 @@ type Body struct {
 	Error      *ErrorBody `json:"error,omitempty"`
 }
 
+type RateLimitBody struct {
+	Success          bool       `json:"success"`
+	StatusCode       int        `json:"statusCode"`
+	StatusCodeCompat int        `json:"status_code"`
+	Message          string     `json:"message"`
+	Error            *ErrorBody `json:"error"`
+}
+
 type ErrorBody struct {
 	Code              string `json:"code"`
 	RetryAfterSeconds *int64 `json:"retryAfterSeconds,omitempty"`
@@ -80,10 +88,11 @@ func RateLimited(c *gin.Context, retryAfterSeconds int64) {
 		retryAfterSeconds = 1
 	}
 	c.Header("Retry-After", strconv.FormatInt(retryAfterSeconds, 10))
-	c.JSON(http.StatusTooManyRequests, Body{
-		Success:    false,
-		StatusCode: http.StatusTooManyRequests,
-		Message:    "Too many requests",
+	c.JSON(http.StatusTooManyRequests, RateLimitBody{
+		Success:          false,
+		StatusCode:       http.StatusTooManyRequests,
+		StatusCodeCompat: http.StatusTooManyRequests,
+		Message:          "Too many requests",
 		Error: &ErrorBody{
 			Code:              "RATE_LIMITED",
 			RetryAfterSeconds: &retryAfterSeconds,

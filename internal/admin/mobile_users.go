@@ -584,7 +584,7 @@ func (s *Service) expireRestrictionRowTx(ctx context.Context, tx *gorm.DB, userU
 		after[key] = value
 	}
 	after["status"] = restriction.StatusExpired
-	return insertAdminAuditLogTx(ctx, tx, nil, AuditActorSystem, "USER_RESTRICTION_EXPIRED", auditResourceUser, &userUUID, &reason, before, after, RequestMeta{IPAddress: "system", UserAgent: "restriction-expiry"})
+	return insertAdminAuditLogTx(ctx, tx, nil, AuditActorSystem, "USER_RESTRICTION_EXPIRED", auditResourceUser, &userUUID, &reason, before, after, RequestMeta{IPAddress: "system", UserAgent: "restriction-expiry", RequestID: "system"})
 }
 
 func (s *Service) recentReports(ctx context.Context, userID uint64) ([]AdminRecentReport, error) {

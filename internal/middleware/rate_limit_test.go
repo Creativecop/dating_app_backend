@@ -35,7 +35,9 @@ func TestRateLimiterFailClosedReturnsRateLimited(t *testing.T) {
 		t.Fatalf("Retry-After = %q, want 60", recorder.Header().Get("Retry-After"))
 	}
 	var body struct {
-		Error struct {
+		StatusCode       int `json:"statusCode"`
+		StatusCodeCompat int `json:"status_code"`
+		Error            struct {
 			Code              string `json:"code"`
 			RetryAfterSeconds int64  `json:"retryAfterSeconds"`
 		} `json:"error"`
@@ -45,6 +47,9 @@ func TestRateLimiterFailClosedReturnsRateLimited(t *testing.T) {
 	}
 	if body.Error.Code != "RATE_LIMITED" || body.Error.RetryAfterSeconds != 60 {
 		t.Fatalf("unexpected rate limit body: %#v", body.Error)
+	}
+	if body.StatusCode != http.StatusTooManyRequests || body.StatusCodeCompat != http.StatusTooManyRequests {
+		t.Fatalf("unexpected rate limit status fields: statusCode=%d status_code=%d", body.StatusCode, body.StatusCodeCompat)
 	}
 }
 

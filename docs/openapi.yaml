@@ -1675,6 +1675,10 @@ components:
         statusCode:
           type: integer
           example: 400
+        status_code:
+          type: integer
+          description: Compatibility alias returned by rate-limit errors.
+          example: 429
         message:
           type: string
           example: Validation failed
@@ -1685,6 +1689,10 @@ components:
             code:
               type: string
               example: VALIDATION_ERROR
+            retryAfterSeconds:
+              type: integer
+              format: int64
+              example: 60
             details:
               nullable: true
               additionalProperties: true
@@ -2070,6 +2078,9 @@ components:
         afterSnapshot:
           type: object
           additionalProperties: true
+        requestId:
+          type: string
+          nullable: true
         ipAddress:
           type: string
           nullable: true
