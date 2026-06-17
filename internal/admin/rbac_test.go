@@ -23,16 +23,22 @@ func TestRolePermissionMatrix(t *testing.T) {
 		{RoleFinanceAdmin, PermissionWalletAdjust, PermissionRolesManage},
 		{RoleFinanceAdmin, PermissionAnalyticsSubscriptionPaymentsRead, PermissionAnalyticsReportsRead},
 		{RoleFinanceAdmin, PermissionPaymentRequestsRead, PermissionAuditRead},
+		{RoleFinanceAdmin, PermissionPaymentRequestsApprove, PermissionGamesRead},
 		{RoleTrustSafety, PermissionCommentsModerate, PermissionWalletAdjust},
 		{RoleTrustSafety, PermissionAnalyticsReportsRead, PermissionAnalyticsSubscriptionPaymentsRead},
 		{RoleTrustSafety, PermissionAnalyticsRestrictionsRead, PermissionAuditRead},
+		{RoleTrustSafety, PermissionGamesForceEnd, PermissionGamesManage},
 		{RoleSupportAgent, PermissionReportsReview, PermissionCommentsModerate},
 		{RoleSupportAgent, PermissionUsersRead, PermissionAuditRead},
+		{RoleSupportAgent, PermissionGamesRead, PermissionGamesForceEnd},
 		{RoleGiftManager, PermissionGiftsManage, PermissionAgencyManage},
+		{RoleGiftManager, PermissionGiftsManage, PermissionGamesRead},
 		{RoleAgencyManager, PermissionAgencyManage, PermissionGiftsManage},
 		{RoleResellerManager, PermissionResellerAllocate, PermissionWalletAdjust},
 		{RoleAnalyst, PermissionAnalyticsRead, PermissionUsersRead},
 		{RoleAnalyst, PermissionAnalyticsSubscriptionPaymentsRead, PermissionPaymentRequestsRead},
+		{RoleAnalyst, PermissionGamesRead, PermissionGamesForceEnd},
+		{RolePlatformAdmin, PermissionGamesAuditRead, PermissionWalletAdjust},
 	}
 
 	for _, test := range tests {
@@ -44,6 +50,21 @@ func TestRolePermissionMatrix(t *testing.T) {
 				t.Fatalf("%s should not allow %s", test.role, test.disallowed)
 			}
 		})
+	}
+}
+
+func TestAllPermissionsIncludesFutureGamePermissions(t *testing.T) {
+	permissions := AllPermissions()
+	for _, permission := range []string{
+		PermissionGamesRead,
+		PermissionGamesManage,
+		PermissionGamesForceEnd,
+		PermissionGamesAnalyticsRead,
+		PermissionGamesAuditRead,
+	} {
+		if !hasString(permissions, permission) {
+			t.Fatalf("AllPermissions missing %s", permission)
+		}
 	}
 }
 

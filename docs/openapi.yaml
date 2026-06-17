@@ -1684,6 +1684,12 @@ components:
           properties:
             trustSafety:
               type: boolean
+            games:
+              type: boolean
+            pkBattle:
+              type: boolean
+            greedyGame:
+              type: boolean
             wallet:
               type: boolean
             gift:

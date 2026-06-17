@@ -616,7 +616,7 @@ Admin capabilities:
 GET /api/v1/admin/capabilities
 ```
 
-Capabilities are backend-derived from registered services and enabled modules; permissions do not imply that a module exists. In this repo, Trust & Safety report review is enabled, while wallet, gift, agency, reseller, live, live-comment, and chat moderation modules are disabled until their domain packages exist.
+Capabilities are backend-derived from registered services and enabled modules; permissions do not imply that a module exists. In this repo, Trust & Safety report review is enabled, while games, PK Battle, Greedy Game, wallet, gift, agency, reseller, live, live-comment, and chat moderation modules are disabled until their domain packages exist.
 
 Example response data:
 
@@ -624,6 +624,9 @@ Example response data:
 {
   "modules": {
     "trustSafety": true,
+    "games": false,
+    "pkBattle": false,
+    "greedyGame": false,
     "wallet": false,
     "gift": false,
     "agency": false,

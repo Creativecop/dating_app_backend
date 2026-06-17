@@ -130,6 +130,9 @@ type AdminModuleCapabilities struct {
 	TrustSafety                  bool `json:"trustSafety"`
 	SubscriptionPayments         bool `json:"subscriptionPayments"`
 	SubscriptionPaymentAnalytics bool `json:"subscriptionPaymentAnalytics"`
+	Games                        bool `json:"games"`
+	PKBattle                     bool `json:"pkBattle"`
+	GreedyGame                   bool `json:"greedyGame"`
 	Wallet                       bool `json:"wallet"`
 	Gift                         bool `json:"gift"`
 	Agency                       bool `json:"agency"`
